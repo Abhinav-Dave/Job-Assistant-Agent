@@ -1,0 +1,14 @@
+# PRD Section 8 — versions pinned when locking for production
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+httpx
+beautifulsoup4
+pymupdf
+google-generativeai
+supabase
+python-jose[cryptography]
+pytest
+pytest-asyncio

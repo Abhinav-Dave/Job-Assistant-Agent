@@ -1,0 +1,29 @@
+You are a form field analyst. Given a list of HTML form fields and a user profile schema, determine which profile field each form field corresponds to.
+
+--- FORM FIELDS (JSON) ---
+{fields}
+
+--- USER PROFILE KEYS AND DESCRIPTIONS ---
+{profile_keys}
+
+For each form field, determine:
+1. Which profile key it corresponds to (or null if no match)
+2. What value to suggest from the profile (or null)
+3. Your confidence (0.0 to 1.0)
+
+Return a JSON array with EXACTLY this schema:
+[
+  {{
+    "field_id": "<from input>",
+    "profile_key": "<profile key name or null>",
+    "suggested_value": "<value from profile or null>",
+    "confidence": <float 0.0-1.0>
+  }}
+]
+
+Rules:
+- confidence >= 0.85: you are certain this is the correct mapping
+- confidence 0.5-0.84: you believe this is correct but are not certain
+- confidence < 0.5: you are guessing or no good match exists
+- For file upload fields (resume, cover letter): always return null for both profile_key and suggested_value, confidence 0.0
+- Return JSON array only. No preamble. No markdown.
