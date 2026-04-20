@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-04-20
 
-**Current phase:** Phase 5 — Scraper & PDF parser tools (PRD Section 21)
+**Current phase:** Phase 6 — Gemini LLM service (PRD Section 21)
 
 ---
 
@@ -14,7 +14,7 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
 - [x] **Phase 2** — Supabase + auth (backend): Python client, JWT middleware, protected routes, health + verification scripts. *Dashboard:* migrations, RLS, `resumes` bucket per [docs/setup-external-services.md](docs/setup-external-services.md) if not already applied. *Automated checks:* `cd backend` → `python verify_db.py` → `python verify_phase2.py` → `python -m pytest tests/ -v`.
 - [x] **Phase 3** — Pydantic schemas + unit tests (`backend/schemas/*`, `backend/tests/unit/test_schemas.py`). *Check:* `python -m pytest backend/tests/unit/test_schemas.py -v`. *Deps:* `pydantic[email]` in `backend/requirements.txt` for `EmailStr`.
 - [x] **Phase 4** — FastAPI routes (full mock data), structured logging, CORS, `GET /api/health` (DB + LLM ping), Pydantic response models, `JsonHttpError` for PRD-shaped 422s, `middleware/logging.py` → stdout + `backend/logs/app.log`
-- [ ] **Phase 5** — Scraper & PDF parser tools
+- [x] **Phase 5** — Scraper & PDF parser tools
 - [ ] **Phase 6** — Gemini LLM service
 - [ ] **Phase 7** — Resume scorer agent
 - [ ] **Phase 8** — Answer generator agent
@@ -29,6 +29,7 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
 
 - **Phase 2 (backend) done:** `settings.py` loads `backend/.env` then repo root `.env`. `services/supabase.py`, `middleware/auth.py` (`verify_jwt`, `get_current_user`), all protected routes under `/api`, `verify_db.py` / `verify_phase2.py` for acceptance checks.
 - **Phase 4 (backend) done:** Routers return PRD-shaped mocks with `response_model` from `schemas/`; `StructuredLoggingMiddleware` (JSON lines); `services/llm.check_llm_reachable()` for health when `GOOGLE_GEMINI_API_KEY` is set; `exceptions.JsonHttpError` for flat JSON errors on resume validation.
+- **Phase 5 (backend tools) done:** Implemented `tools/scraper.py` (`scrape_job_description`, `scrape_form_fields`) with `httpx` + `BeautifulSoup` (selector fallbacks, cleaned text, graceful failures, normalized `FormField` output) and `tools/pdf_parser.py` (`extract_text_from_pdf`) with `PyMuPDF` handling empty/scanned/invalid PDFs safely. Added deterministic unit tests in `tests/unit/test_scraper.py` and `tests/unit/test_pdf_parser.py`; verification command passed: `python -m pytest backend/tests/unit/test_scraper.py backend/tests/unit/test_pdf_parser.py -v`.
 
 ### Phase 4 verification issues and fixes (for future reference)
 
