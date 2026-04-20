@@ -43,6 +43,37 @@ def test_work_history_item_valid_and_invalid() -> None:
     )
     assert valid.is_current is True
 
+    iso = WorkHistoryItem(
+        id=wid,
+        company="Acme",
+        role="Eng",
+        start_date="2022-06-15",
+        end_date="2023-01-01",
+        is_current=False,
+    )
+    assert iso.start_date == "2022-06"
+    assert iso.end_date == "2023-01"
+
+    current_end = WorkHistoryItem(
+        id=wid,
+        company="Acme",
+        role="Eng",
+        start_date="2022-06",
+        end_date="string",
+        is_current=True,
+    )
+    assert current_end.end_date is None
+
+    with pytest.raises(ValidationError) as excinfo:
+        WorkHistoryItem(
+            id=wid,
+            company="Acme",
+            role="Eng",
+            start_date="string",
+            end_date=None,
+        )
+    assert "Swagger" in str(excinfo.value)
+
     with pytest.raises(ValidationError):
         WorkHistoryItem(
             id=wid,

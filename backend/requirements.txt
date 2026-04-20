@@ -9,6 +9,8 @@ httpx
 beautifulsoup4
 pymupdf
 google-generativeai
+google-genai
+groq
 supabase
 python-jose[cryptography]
 pytest

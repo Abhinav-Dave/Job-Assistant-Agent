@@ -1,6 +1,9 @@
+import json
+
 import pytest
 
 from agents import resume_scorer
+from services.llm import LLMError
 
 
 def _valid_payload(match_score: int = 82) -> dict:
@@ -113,3 +116,31 @@ def test_analyze_resume_and_jd_jd_too_short() -> None:
             user_id="user-6",
         )
     assert exc.value.error == "jd_too_short"
+
+
+def test_analyze_resume_and_jd_falls_back_to_groq_when_gemini_overloaded(monkeypatch) -> None:
+    monkeypatch.setattr(
+        resume_scorer,
+        "load_prompt",
+        lambda _name: "RESUME:\n{resume}\nJD:\n{jd}",
+    )
+    monkeypatch.setattr(
+        resume_scorer,
+        "call_gemini",
+        lambda *_a, **_k: (_ for _ in ()).throw(
+            LLMError("llm_unavailable", "503 UNAVAILABLE high demand")
+        ),
+    )
+    monkeypatch.setattr(
+        resume_scorer,
+        "call_groq",
+        lambda *_a, **_k: json.dumps(_valid_payload(match_score=77)),
+    )
+    monkeypatch.setattr(resume_scorer, "parse_json_from_response", lambda raw: json.loads(raw))
+
+    result = resume_scorer.analyze_resume_and_jd(
+        resume_source={"type": "text", "data": "A" * 180},
+        jd_source={"type": "text", "data": "B" * 200},
+        user_id="user-groq",
+    )
+    assert result.match_score == 77

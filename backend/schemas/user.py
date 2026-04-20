@@ -4,17 +4,42 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from re import fullmatch
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-_YEAR_MONTH_PATTERN = r"\d{4}-(0[1-9]|1[0-2])"
+def _coerce_year_month(value: object, *, field_label: str) -> str:
+    """Accept YYYY-MM, ISO dates (YYYY-MM-DD), and single-digit months; reject OpenAPI 'string' placeholders."""
+    if value is None:
+        raise ValueError(f"{field_label} is required")
+    v = str(value).strip()
+    low = v.lower()
+    if low in ("string", "str"):
+        raise ValueError(
+            f'{field_label} must be YYYY-MM (e.g. 2022-06). '
+            'Swagger UI often prefills the word "string" — replace it with a real date.'
+        )
+    if low in ("null", "none", ""):
+        raise ValueError(f"{field_label} cannot be empty; use null only for end_date when current role")
+    if "T" in v:
+        v = v.split("T", 1)[0].strip()
+    parts = v.split("-")
+    if len(parts) >= 2 and parts[0].isdigit() and len(parts[0]) == 4 and parts[1].isdigit():
+        y, m = int(parts[0]), int(parts[1])
+        if 1000 <= y <= 9999 and 1 <= m <= 12:
+            return f"{y:04d}-{m:02d}"
+    raise ValueError(f'{field_label} must be "YYYY-MM" (received {value!r})')
 
 
-def _is_year_month(value: str) -> bool:
-    return bool(fullmatch(_YEAR_MONTH_PATTERN, value))
+def _coerce_end_date(value: object) -> str | None:
+    if value is None:
+        return None
+    v = str(value).strip()
+    low = v.lower()
+    if low in ("", "null", "none", "string", "str"):
+        return None
+    return _coerce_year_month(v, field_label="end_date")
 
 
 class UserPreferences(BaseModel):
@@ -36,27 +61,28 @@ class WorkHistoryItem(BaseModel):
     id: UUID
     company: str = Field(min_length=1)
     role: str = Field(min_length=1)
-    start_date: str = Field(description='Month "YYYY-MM"')
-    end_date: str | None = None
+    start_date: str = Field(
+        description='Month "YYYY-MM" (or YYYY-MM-DD; Swagger: do not leave the default "string").',
+        examples=["2022-06"],
+    )
+    end_date: str | None = Field(
+        default=None,
+        description='Month "YYYY-MM", or null / omit for current role.',
+        examples=["2023-12"],
+    )
     is_current: bool = False
     bullets: list[str] = Field(default_factory=list)
     display_order: int = 0
 
-    @field_validator("start_date")
+    @field_validator("start_date", mode="before")
     @classmethod
-    def validate_start_date(cls, v: str) -> str:
-        if not _is_year_month(v):
-            raise ValueError('start_date must be "YYYY-MM"')
-        return v
+    def validate_start_date(cls, v: object) -> str:
+        return _coerce_year_month(v, field_label="start_date")
 
-    @field_validator("end_date")
+    @field_validator("end_date", mode="before")
     @classmethod
-    def validate_end_date(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        if not _is_year_month(v):
-            raise ValueError('end_date must be "YYYY-MM" or null')
-        return v
+    def validate_end_date(cls, v: object) -> str | None:
+        return _coerce_end_date(v)
 
 
 class EducationItem(BaseModel):

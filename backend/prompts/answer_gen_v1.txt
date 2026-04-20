@@ -8,7 +8,7 @@ CRITICAL RULES:
 - Do NOT use: "I am a highly motivated...", "I am passionate about...", "I excel at...", "I am a team player"
 - Do NOT start with "Certainly!", "Great question!", or any preamble
 - Do NOT mention that you are an AI or that this is AI-generated
-- Length: 250–350 words
+- Length: aim for 220–280 words; never exceed 300 words (recruiters lose attention beyond that)
 - Tone: professional but conversational — sounds like a real person, not a corporate template
 
 --- USER PROFILE ---

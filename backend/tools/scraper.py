@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from typing import Iterable
 from urllib.parse import urlparse
 
@@ -10,8 +12,9 @@ from bs4 import BeautifulSoup
 
 from schemas.autofill import FormField
 
-_REQUEST_TIMEOUT_SECONDS = 10.0
+_REQUEST_TIMEOUT_SECONDS = 20.0
 _MAX_JD_CHARS = 4000
+_MIN_JD_CHARS = 100
 _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -43,6 +46,84 @@ def _clean_text(text: str) -> str:
     return " ".join(text.split()).strip()
 
 
+def _strip_html_to_text(html_fragment: str) -> str:
+    if not html_fragment or "<" not in html_fragment:
+        return _clean_text(html_fragment)
+    try:
+        frag = BeautifulSoup(html_fragment, "html.parser")
+        return _clean_text(frag.get_text(separator=" ", strip=True))
+    except Exception:
+        return _clean_text(re.sub(r"<[^>]+>", " ", html_fragment))
+
+
+def _extract_json_ld_job_description(soup: BeautifulSoup) -> str:
+    """Pull JobPosting (or similar) description from JSON-LD before scripts are removed."""
+    chunks: list[str] = []
+    for script in soup.find_all("script", attrs={"type": lambda t: t and "ld+json" in t.lower()}):
+        raw = (script.string or script.get_text() or "").strip()
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        items = data if isinstance(data, list) else [data]
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            raw_type = item.get("@type")
+            if isinstance(raw_type, list):
+                type_names = {t for t in raw_type if isinstance(t, str)}
+            elif isinstance(raw_type, str):
+                type_names = {raw_type}
+            else:
+                type_names = set()
+            looks_like_job = (
+                "JobPosting" in type_names
+                or "WebPage" in type_names
+                or (bool(item.get("title")) and bool(item.get("hiringOrganization")))
+            )
+            if not looks_like_job:
+                continue
+            desc = item.get("description")
+            if isinstance(desc, str) and len(desc.strip()) > 40:
+                chunks.append(_strip_html_to_text(desc))
+            elif isinstance(desc, dict):
+                val = desc.get("text") or desc.get("@value")
+                if isinstance(val, str) and len(val.strip()) > 40:
+                    chunks.append(_strip_html_to_text(val))
+    return _clean_text(" ".join(chunks))
+
+
+def _extract_ats_description_nodes(soup: BeautifulSoup) -> str:
+    """Workday, Greenhouse, and similar often expose a dedicated description node."""
+    automation_attrs = (
+        "jobPostingDescription",
+        "job-description",
+        "jobDescriptionText",
+        "job-details",
+    )
+    chunks: list[str] = []
+    for attr_val in automation_attrs:
+        for node in soup.find_all(attrs={"data-automation": attr_val}):
+            t = _clean_text(node.get_text(separator=" ", strip=True))
+            if len(t) >= 80:
+                chunks.append(t)
+        for node in soup.select(f"[data-qa='{attr_val}']"):
+            t = _clean_text(node.get_text(separator=" ", strip=True))
+            if len(t) >= 80:
+                chunks.append(t)
+    for sel in ("div.job-description", "div#job-description", "section.job-description"):
+        node = soup.select_one(sel)
+        if node:
+            t = _clean_text(node.get_text(separator=" ", strip=True))
+            if len(t) >= 80:
+                chunks.append(t)
+    if not chunks:
+        return ""
+    return max(chunks, key=len)
+
+
 def scrape_job_description(url: str) -> str:
     """Fetch and extract visible job description text from a URL.
 
@@ -56,15 +137,39 @@ def scrape_job_description(url: str) -> str:
 
     try:
         soup = BeautifulSoup(html, "html.parser")
+        from_ld = _extract_json_ld_job_description(soup)
+        from_ats = _extract_ats_description_nodes(soup)
+
         for tag_name in ("script", "style", "noscript", "nav", "footer"):
             for node in soup.find_all(tag_name):
                 node.decompose()
 
         root = soup.find("main") or soup.find("article") or soup.find("body") or soup
-        text = _clean_text(root.get_text(separator=" ", strip=True))
-        return text[:_MAX_JD_CHARS]
+        body = _clean_text(root.get_text(separator=" ", strip=True))
+
+        candidates = [c for c in (from_ld, from_ats, body) if c and len(c.strip()) >= 40]
+        if not candidates:
+            return ""
+        best = max(candidates, key=len)
+        return best[:_MAX_JD_CHARS]
     except Exception:
         return ""
+
+
+def best_effort_jd_text(jd_url: str | None, jd_text: str | None) -> str:
+    """Prefer scraping ``jd_url`` when it yields enough text; else use pasted ``jd_text``.
+
+    Use this for ATS pages (e.g. Workday) that often need a pasted fallback.
+    """
+    u = (jd_url or "").strip()
+    t = (jd_text or "").strip()
+    if u:
+        scraped = scrape_job_description(u)
+        if len(scraped.strip()) >= _MIN_JD_CHARS:
+            return scraped[:_MAX_JD_CHARS]
+    if len(t) >= _MIN_JD_CHARS:
+        return t[:_MAX_JD_CHARS]
+    return ""
 
 
 def _extract_label(control, soup: BeautifulSoup) -> str | None:

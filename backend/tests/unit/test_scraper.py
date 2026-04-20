@@ -1,6 +1,8 @@
+import json
+
 import httpx
 
-from tools.scraper import scrape_form_fields, scrape_job_description
+from tools.scraper import best_effort_jd_text, scrape_form_fields, scrape_job_description
 
 
 class _MockResponse:
@@ -44,6 +46,35 @@ def test_scrape_job_description_extracts_clean_text_and_limits(monkeypatch) -> N
     assert "ignore footer content" not in result
     assert "Data Scientist role." in result
     assert len(result) <= 4000
+
+
+def test_scrape_job_description_uses_json_ld_job_posting(monkeypatch) -> None:
+    long_desc = "Senior backend role requiring Python, FastAPI, and PostgreSQL. " * 5
+    payload = {"@type": "JobPosting", "title": "Backend Engineer", "description": long_desc}
+    json_ld = json.dumps(payload)
+    html = f"""
+    <html><head>
+      <script type="application/ld+json">
+      {json_ld}
+      </script>
+    </head><body><nav>nav noise</nav><p>thin visible body</p></body></html>
+    """
+
+    def _mock_get(*args, **kwargs):  # noqa: ANN002, ANN003
+        return _MockResponse(html)
+
+    monkeypatch.setattr("tools.scraper.httpx.get", _mock_get)
+    result = scrape_job_description("https://example.com/jobs/workday-style")
+    assert "Python" in result
+    assert "nav noise" not in result
+
+
+def test_best_effort_jd_falls_back_to_paste_when_scrape_too_short(monkeypatch) -> None:
+    monkeypatch.setattr("tools.scraper.scrape_job_description", lambda _url: "tiny")
+    pasted = "Role requirements: " + "detail " * 40
+    out = best_effort_jd_text("https://workday.example/job/1", pasted)
+    assert "detail" in out
+    assert len(out) >= 100
 
 
 def test_scrape_job_description_handles_http_failure(monkeypatch) -> None:

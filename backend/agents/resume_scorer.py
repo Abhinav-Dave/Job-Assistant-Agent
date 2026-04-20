@@ -10,7 +10,7 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from schemas.resume import ResumeScoreResult
-from services.llm import LLMError, call_gemini, load_prompt, parse_json_from_response
+from services.llm import LLMError, call_gemini, call_groq, load_prompt, parse_json_from_response
 from tools.pdf_parser import extract_text_from_pdf
 from tools.scraper import scrape_job_description
 
@@ -20,6 +20,8 @@ _MIN_TEXT_LENGTH = 100
 _MAX_RESUME_CHARS = 6000
 _MAX_JD_CHARS = 4000
 _MAX_TOKENS = 1500
+_RESUME_LLM_TIMEOUT = 45
+_GEMINI_FAILOVER_CODES = frozenset({"llm_unavailable", "llm_empty_response"})
 
 ResumeSourceType = Literal["pdf", "text"]
 JDSourceType = Literal["url", "text"]
@@ -114,6 +116,27 @@ def _parse_and_validate(raw: str) -> ResumeScoreResult:
     return ResumeScoreResult(**parsed)
 
 
+def _call_llm_json(prompt: str) -> str:
+    """Gemini first (structured JSON); on overload/empty, Groq if configured."""
+    try:
+        return call_gemini(
+            prompt,
+            max_tokens=_MAX_TOKENS,
+            expect_json=True,
+            timeout_seconds=_RESUME_LLM_TIMEOUT,
+        )
+    except LLMError as exc:
+        if exc.code not in _GEMINI_FAILOVER_CODES:
+            raise
+        logger.warning("resume_scorer: Gemini failed (%s), trying Groq", exc.code)
+    return call_groq(
+        prompt,
+        max_tokens=_MAX_TOKENS,
+        expect_json=True,
+        timeout_seconds=_RESUME_LLM_TIMEOUT,
+    )
+
+
 def analyze_resume_and_jd(
     resume_source: Any, jd_source: Any, user_id: str
 ) -> ResumeScoreResult:
@@ -131,13 +154,13 @@ def analyze_resume_and_jd(
 
         prompt_template = load_prompt("resume_score_v1.txt")
         prompt = prompt_template.format(resume=resume_text, jd=jd_text)
-        raw = call_gemini(prompt, max_tokens=_MAX_TOKENS)
+        raw = _call_llm_json(prompt)
 
         try:
             result = _parse_and_validate(raw)
         except (ValidationError, ValueError):
             correction_prompt = _build_correction_prompt(raw)
-            raw_retry = call_gemini(correction_prompt, max_tokens=_MAX_TOKENS)
+            raw_retry = _call_llm_json(correction_prompt)
             result = _parse_and_validate(raw_retry)
 
         duration_ms = int((time.perf_counter() - started_at) * 1000)

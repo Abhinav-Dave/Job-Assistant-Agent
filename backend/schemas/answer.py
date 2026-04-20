@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from schemas.user import UserProfile
+
 
 class AnswerRequest(BaseModel):
     """`POST /api/generate/answer` body."""
@@ -13,6 +15,7 @@ class AnswerRequest(BaseModel):
     question: str = Field(min_length=1)
     jd_text: str | None = None
     jd_url: str | None = None
+    profile: UserProfile | None = None
 
     @model_validator(mode="after")
     def jd_source_present(self) -> AnswerRequest:

@@ -30,9 +30,14 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = ""
 
     google_gemini_api_key: str = ""
+    groq_api_key: str = ""
     gemini_model: str = Field(
         default="gemini-2.5-flash",
         description="GenerativeModel id; override with env GEMINI_MODEL.",
+    )
+    gemini_model_fallback: str = Field(
+        default="gemini-2.5-flash-lite",
+        description="Second model on Gemini 429/503 overload (avoid gemini-2.0-flash: deprecated for new API keys). Empty disables.",
     )
 
     environment: str = "development"

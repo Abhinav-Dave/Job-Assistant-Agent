@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -42,17 +43,111 @@ def _timeout_seconds() -> int:
     return value if value > 0 else _DEFAULT_TIMEOUT_SECONDS
 
 
-def _build_gemini_model(api_key: str, model_name: str):
-    import google.generativeai as genai
+def _build_gemini_clients(api_key: str, model_name: str):
+    """Return active Gemini backend tuple."""
+    try:
+        from google import genai as google_genai
 
-    genai.configure(api_key=api_key)
-    return genai, genai.GenerativeModel(model_name)
+        client = google_genai.Client(api_key=api_key)
+        return "google.genai", client, model_name, None
+    except ImportError:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            import google.generativeai as legacy_genai
+
+        legacy_genai.configure(api_key=api_key)
+        model = legacy_genai.GenerativeModel(model_name)
+        return "google.generativeai", model, model_name, legacy_genai
 
 
 def _build_groq_client(api_key: str):
     from groq import Groq
 
     return Groq(api_key=api_key)
+
+
+def _gemini_model_chain(primary: str, fallback: str) -> list[str]:
+    primary_clean = (primary or _DEFAULT_GEMINI_MODEL).strip() or _DEFAULT_GEMINI_MODEL
+    out = [primary_clean]
+    fb = (fallback or "").strip()
+    if fb and fb not in out:
+        out.append(fb)
+    return out
+
+
+_GEMINI_RESERVE_LITE = "gemini-2.5-flash-lite"
+
+
+def _extend_gemini_model_chain(models: list[str]) -> list[str]:
+    """Append stable Flash-Lite when chain still references deprecated gemini-2.0-flash* (404 for new keys)."""
+    out = list(models)
+    if any(m.startswith("gemini-2.0-flash") for m in out) and _GEMINI_RESERVE_LITE not in out:
+        out.append(_GEMINI_RESERVE_LITE)
+    return out
+
+
+def _gemini_retryable(exc: BaseException) -> bool:
+    """Whether to try the next model in the chain."""
+    raw = str(exc)
+    msg = raw.upper()
+    if (
+        "503" in raw
+        or "UNAVAILABLE" in msg
+        or "429" in raw
+        or "RESOURCE_EXHAUSTED" in msg
+        or "OVERLOADED" in msg
+    ):
+        return True
+    # e.g. gemini-2.0-flash removed for new API projects — try next model
+    return "NO LONGER AVAILABLE" in msg
+
+
+def _call_gemini_once(
+    *,
+    api_key: str,
+    model_name: str,
+    prompt: str,
+    max_tokens: int,
+    expect_json: bool,
+    resolved_timeout_seconds: int,
+) -> str:
+    try:
+        backend, client_or_model, resolved_model_name, legacy_module = _build_gemini_clients(
+            api_key=api_key,
+            model_name=model_name,
+        )
+        generation_config_kwargs: dict[str, Any] = {
+            "max_output_tokens": max_tokens,
+            "temperature": 0.3,
+        }
+        if expect_json:
+            generation_config_kwargs["response_mime_type"] = "application/json"
+
+        if backend == "google.genai":
+            response = client_or_model.models.generate_content(
+                model=resolved_model_name,
+                contents=prompt,
+                config=generation_config_kwargs,
+            )
+        else:
+            response = client_or_model.generate_content(
+                prompt,
+                generation_config=legacy_module.GenerationConfig(**generation_config_kwargs),
+                request_options={"timeout": resolved_timeout_seconds},
+            )
+    except Exception as exc:
+        logger.warning("Gemini API error (%s): %s", model_name, exc, exc_info=False)
+        raise LLMError("llm_unavailable", str(exc)) from exc
+
+    try:
+        text = (getattr(response, "text", None) or "").strip()
+    except Exception as exc:
+        logger.warning("Gemini response read error: %s", exc, exc_info=False)
+        raise LLMError("llm_empty_response", str(exc)) from exc
+    if text:
+        return text
+
+    raise LLMError("llm_empty_response", "Gemini returned an empty response")
 
 
 def load_prompt(filename: str) -> str:
@@ -72,7 +167,12 @@ def load_prompt(filename: str) -> str:
     return prompt_path.read_text(encoding="utf-8")
 
 
-def call_gemini(prompt: str, max_tokens: int = 1500) -> str:
+def call_gemini(
+    prompt: str,
+    max_tokens: int = 1500,
+    expect_json: bool = True,
+    timeout_seconds: int | None = None,
+) -> str:
     """Send prompt to Gemini and return response text."""
     if not prompt or not prompt.strip():
         raise LLMError("invalid_input", "Prompt must not be empty")
@@ -84,54 +184,75 @@ def call_gemini(prompt: str, max_tokens: int = 1500) -> str:
     if not api_key:
         raise LLMError("llm_not_configured", "GOOGLE_GEMINI_API_KEY is not configured")
 
-    model_name = (settings.gemini_model or _DEFAULT_GEMINI_MODEL).strip() or _DEFAULT_GEMINI_MODEL
-    timeout_seconds = _timeout_seconds()
+    resolved_timeout_seconds = timeout_seconds or _timeout_seconds()
+    fb = getattr(settings, "gemini_model_fallback", "") or ""
+    models = _extend_gemini_model_chain(_gemini_model_chain(settings.gemini_model, fb))
 
-    try:
-        genai, model = _build_gemini_model(api_key=api_key, model_name=model_name)
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
-                max_output_tokens=max_tokens,
-                temperature=0.3,
-                response_mime_type="application/json",
-            ),
-            request_options={"timeout": timeout_seconds},
-        )
-    except Exception as exc:
-        logger.warning("Gemini API error: %s", exc, exc_info=False)
-        raise LLMError("llm_unavailable", str(exc)) from exc
+    last: LLMError | None = None
+    for idx, model_name in enumerate(models):
+        try:
+            return _call_gemini_once(
+                api_key=api_key,
+                model_name=model_name,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                expect_json=expect_json,
+                resolved_timeout_seconds=resolved_timeout_seconds,
+            )
+        except LLMError as exc:
+            if exc.code == "llm_empty_response":
+                raise
+            last = exc
+            if idx < len(models) - 1 and _gemini_retryable(exc):
+                logger.warning(
+                    "Gemini model %s failed (%s), retrying with %s",
+                    model_name,
+                    exc,
+                    models[idx + 1],
+                )
+                continue
+            raise
+    if last:
+        raise last
+    raise LLMError("llm_unavailable", "No Gemini model configured")
 
-    try:
-        text = (getattr(response, "text", None) or "").strip()
-    except Exception as exc:
-        logger.warning("Gemini response read error: %s", exc, exc_info=False)
-        raise LLMError("llm_empty_response", str(exc)) from exc
-    if text:
-        return text
 
-    raise LLMError("llm_empty_response", "Gemini returned an empty response")
-
-
-def call_groq(prompt: str, max_tokens: int = 1500) -> str:
+def call_groq(
+    prompt: str,
+    max_tokens: int = 1500,
+    expect_json: bool = False,
+    timeout_seconds: int | None = None,
+) -> str:
     """Optional fallback using Groq if installed and configured."""
     if not prompt or not prompt.strip():
         raise LLMError("invalid_input", "Prompt must not be empty")
     if max_tokens <= 0:
         raise LLMError("invalid_input", "max_tokens must be > 0")
 
-    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    settings = get_settings()
+    api_key = (
+        os.getenv("GROQ_API_KEY", "").strip()
+        or os.getenv("groq_api_key", "").strip()
+        or getattr(settings, "groq_api_key", "").strip()
+    )
     if not api_key:
         raise LLMError("groq_not_configured", "GROQ_API_KEY is not configured")
 
     model_name = os.getenv("GROQ_MODEL", _DEFAULT_GROQ_MODEL).strip() or _DEFAULT_GROQ_MODEL
+    resolved_timeout_seconds = timeout_seconds or _timeout_seconds()
     try:
         client = _build_groq_client(api_key)
+        create_kwargs: dict[str, Any] = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "max_tokens": max_tokens,
+            "timeout": resolved_timeout_seconds,
+        }
+        if expect_json:
+            create_kwargs["response_format"] = {"type": "json_object"}
         completion = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=max_tokens,
+            **create_kwargs,
         )
         content = completion.choices[0].message.content
         text = (content or "").strip()
@@ -186,20 +307,40 @@ def parse_json_from_response(raw: str) -> dict[str, Any]:
     raise JSONParseError(f"Could not extract valid JSON from response: {payload[:200]}")
 
 
+def _groq_configured() -> bool:
+    settings = get_settings()
+    return bool(
+        os.getenv("GROQ_API_KEY", "").strip()
+        or os.getenv("groq_api_key", "").strip()
+        or getattr(settings, "groq_api_key", "").strip()
+    )
+
+
 def check_llm_reachable() -> str:
     """
     Lightweight ping for health checks. Returns:
-    `not_configured` (no API key), `reachable`, or `error`.
+    `not_configured` (no provider keys), `reachable`, or `error`.
+    Tries Gemini first (simple prose ping, not JSON mode), then Groq if configured.
     """
     settings = get_settings()
-    key = (settings.google_gemini_api_key or "").strip()
-    if not key:
+    gemini_key = (settings.google_gemini_api_key or "").strip()
+    if not gemini_key and not _groq_configured():
         return "not_configured"
 
-    try:
-        call_gemini('{"ping":"ok"}', max_tokens=16)
-        return "reachable"
-    except LLMError as e:
-        logger.warning("LLM health ping failed: %s", e, exc_info=False)
-        return "error"
+    ping = "Reply with the single word: OK"
+    if gemini_key:
+        try:
+            call_gemini(ping, max_tokens=32, expect_json=False)
+            return "reachable"
+        except LLMError as e:
+            logger.warning("LLM health ping (Gemini) failed: %s", e, exc_info=False)
+
+    if _groq_configured():
+        try:
+            call_groq(ping, max_tokens=32, expect_json=False)
+            return "reachable"
+        except LLMError as e:
+            logger.warning("LLM health ping (Groq) failed: %s", e, exc_info=False)
+
+    return "error"
 
