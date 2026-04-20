@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-04-20
 
-**Current phase:** Phase 7 — Resume scorer agent (PRD Section 21)
+**Current phase:** Phase 8 — Answer generator agent (PRD Section 21)
 
 ---
 
@@ -16,7 +16,7 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
 - [x] **Phase 4** — FastAPI routes (full mock data), structured logging, CORS, `GET /api/health` (DB + LLM ping), Pydantic response models, `JsonHttpError` for PRD-shaped 422s, `middleware/logging.py` → stdout + `backend/logs/app.log`
 - [x] **Phase 5** — Scraper & PDF parser tools
 - [x] **Phase 6** — Gemini LLM service
-- [ ] **Phase 7** — Resume scorer agent
+- [x] **Phase 7** — Resume scorer agent
 - [ ] **Phase 8** — Answer generator agent
 - [ ] **Phase 9** — Autofill agent
 - [ ] **Phase 10** — Frontend static UI with mock data
@@ -31,6 +31,7 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
 - **Phase 4 (backend) done:** Routers return PRD-shaped mocks with `response_model` from `schemas/`; `StructuredLoggingMiddleware` (JSON lines); `services/llm.check_llm_reachable()` for health when `GOOGLE_GEMINI_API_KEY` is set; `exceptions.JsonHttpError` for flat JSON errors on resume validation.
 - **Phase 5 (backend tools) done:** Implemented `tools/scraper.py` (`scrape_job_description`, `scrape_form_fields`) with `httpx` + `BeautifulSoup` (selector fallbacks, cleaned text, graceful failures, normalized `FormField` output) and `tools/pdf_parser.py` (`extract_text_from_pdf`) with `PyMuPDF` handling empty/scanned/invalid PDFs safely. Added deterministic unit tests in `tests/unit/test_scraper.py` and `tests/unit/test_pdf_parser.py`; verification command passed: `python -m pytest backend/tests/unit/test_scraper.py backend/tests/unit/test_pdf_parser.py -v`.
 - **Phase 6 (backend llm service) done:** Implemented `services/llm.py` production-ready helpers for `load_prompt`, `call_gemini`, optional `call_groq`, and `parse_json_from_response`, including structured errors (`LLMError`, `JSONParseError`, `PromptLoadError`), safe prompt-path loading, timeout/model env handling (`GEMINI_MODEL`, `LLM_TIMEOUT_SECONDS`), and graceful health integration via `check_llm_reachable()`. Added unit tests in `tests/unit/test_llm_service.py`; verification command passed: `python -m pytest backend/tests/unit/test_llm_service.py backend/tests/unit/test_schemas.py -v`.
+- **Phase 7 (resume scorer agent) done:** Implemented `agents/resume_scorer.py` full PRD flow for `analyze_resume_and_jd(resume_source, jd_source, user_id)` with source resolution (PDF/text + URL/text), expected structured agent failures (`pdf_no_text`, `jd_scrape_failed`, `resume_too_short`, `jd_too_short`), input truncation guards, prompt loading via `resume_score_v1.txt`, Gemini invocation, JSON parsing + `ResumeScoreResult` validation, and one retry using a correction prompt on JSON/schema failure. Added logging hooks (agent_name, user_id, duration_ms, score, token placeholders, success/failure) and targeted unit tests in `tests/unit/test_resume_scorer.py`; verification command passed: `python -m pytest backend/tests/unit/test_resume_scorer.py -v`.
 
 ### Phase 4 verification issues and fixes (for future reference)
 
