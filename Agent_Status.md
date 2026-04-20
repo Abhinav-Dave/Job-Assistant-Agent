@@ -10,6 +10,7 @@ Append a new entry after each agent task or phase. PRD reference: Section 20 (Ag
 | 2 | 2026-04-19 | 1 | Git / GitHub | Pre-push audit (gitignore fix for `frontend/lib/`), commit `493174d`, push to `origin/main` | Done |
 | 3 | 2026-04-19 | 2 | `backend/` | Supabase client (`settings.py`, `services/supabase.py`), JWT `verify_jwt` + `get_current_user` in `middleware/auth.py`, protected routes wired on all API routers + `feedback.py`, public `GET /api/health`, helper `verify_db.py`; unit test `tests/unit/test_auth.py` | Done |
 | 4 | 2026-04-19 | 2 | `backend/` + status | Dual-path `.env` loading (`backend/` + repo root), `verify_phase2.py` end-to-end checks (DB + JWT + health), `status.md` / `Agent_Status.md` updated for Phase 2 closure; pre-push audit (no secrets in tracked files, `.env` gitignored); pushed `92e32be` | Done |
+| 5 | 2026-04-19 | 3 | `backend/schemas/` + `backend/tests/unit/test_schemas.py` | Pydantic v2 models: `user.py` (UserPreferences, WorkHistoryItem, EducationItem, UserProfile, UpdateUserRequest), `resume.py`, `answer.py` (model validator for jd_text/jd_url), `application.py` (ApplicationStatus enum), `autofill.py`, `common.py`; package exports in `schemas/__init__.py`; unit tests for ValidationError + happy paths; `backend/requirements.txt` → `pydantic[email]` for EmailStr | Done |
 
 ---
 

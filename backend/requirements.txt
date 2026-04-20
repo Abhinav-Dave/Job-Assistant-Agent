@@ -1,7 +1,7 @@
 # PRD Section 8 — versions pinned when locking for production
 fastapi
 uvicorn[standard]
-pydantic
+pydantic[email]
 pydantic-settings
 python-dotenv
 httpx
