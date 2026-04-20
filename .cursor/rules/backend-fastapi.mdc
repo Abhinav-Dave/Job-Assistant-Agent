@@ -1,0 +1,35 @@
+---
+description: Python FastAPI API patterns (from awesome-cursorrules python-fastapi-api)
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Backend — FastAPI
+
+Source: [awesome-cursorrules — cursorrules-file-cursor-ai-python-fastapi-api](https://github.com/PatrickJS/awesome-cursorrules)
+
+- Concise, technical Python; functional style; avoid classes unless they add clear value.
+- `def` for sync pure logic; `async def` for I/O (HTTP, DB, external APIs).
+- Type hints on all function signatures; **Pydantic v2** models for request/response — not raw dicts.
+- Structure: routers → sub-routes → utilities → schemas/models.
+- **RORO** where helpful: receive/return structured objects (e.g. Pydantic models).
+
+## Errors & validation
+
+- Validate early; **guard clauses** and early returns; happy path last; avoid deep nesting.
+- Use `HTTPException` for expected API errors with clear status codes and messages.
+- Log unexpected errors in middleware; avoid leaking internals to clients.
+
+## FastAPI specifics
+
+- Declarative routes with return type annotations; dependency injection for shared state (DB clients, settings).
+- Prefer **lifespan** context managers over deprecated `@app.on_event` for startup/shutdown.
+- Middleware for CORS, logging, and unhandled errors as appropriate.
+- Async for I/O-bound work; avoid blocking calls inside async routes.
+
+## Performance
+
+- Async DB/HTTP where the stack supports it; cache hot reads when the PRD calls for it.
+- Serialize with Pydantic; keep response models explicit.
+
+Consult FastAPI docs for path operations, dependencies, and middleware.

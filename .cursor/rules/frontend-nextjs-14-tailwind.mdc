@@ -1,0 +1,20 @@
+---
+description: Next.js 14 App Router, Tailwind, TypeScript (from awesome-cursorrules nextjs-14-tailwind-seo)
+globs: frontend/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# Frontend — Next.js 14 + Tailwind
+
+Source: [awesome-cursorrules — cursorrules-cursor-ai-nextjs-14-tailwind-seo-setup](https://github.com/PatrickJS/awesome-cursorrules)
+
+- Use the **App Router** under `app/`; Server Components by default; `'use client'` only when interactivity or browser-only APIs require it.
+- **Tailwind** for styling; avoid inline styles unless necessary.
+- **TypeScript** everywhere; props via `interface`; named exports for shared components; **default export** for `page.tsx` / `layout.tsx` as per Next conventions.
+- **Metadata API** (`export const metadata`) for SEO titles and descriptions.
+- Use **next/image** with dimensions/lazy loading where appropriate.
+- **fetch** in Server Components with `next: { revalidate }` (or cache options) when calling HTTP APIs.
+- Add **`loading.tsx`** and **`error.tsx`** (and error boundaries) for route-level UX.
+- **Route handlers** in `route.ts` for App Router APIs when needed; prefer calling the separate FastAPI backend for core product APIs unless the PRD says otherwise.
+- Accessibility: semantic HTML, labels, keyboard support; align with WCAG when building UI.
+- Prefer inferred types; avoid redundant `React.FC` unless it clarifies children or generics.

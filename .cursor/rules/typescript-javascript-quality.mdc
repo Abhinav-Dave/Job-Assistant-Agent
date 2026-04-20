@@ -1,0 +1,20 @@
+---
+description: JS/TS quality — simplicity, DRY, minimal diffs (from awesome-cursorrules js-ts-code-quality-pro)
+globs: "**/*.{ts,tsx,js,jsx}"
+alwaysApply: false
+---
+
+# JavaScript / TypeScript quality
+
+Source: [awesome-cursorrules — javascript-typescript-code-quality-cursorrules-pro](https://github.com/PatrickJS/awesome-cursorrules)
+
+- **Simplicity > cleverness**; fewer lines usually mean less debt.
+- **Early returns** to avoid deep nesting; **guard clauses** for invalid input.
+- **Descriptive names**; event handlers prefixed with `handle` (e.g. `handleSubmit`).
+- Prefer **immutable, functional** patterns when readability stays high.
+- **DRY** without premature abstraction — one clear abstraction beats three half-used ones.
+- **Minimal scope:** change only what the task requires; no drive-by refactors or unrelated formatting.
+- Do not remove or rewrite existing comments unless fixing accuracy.
+- For non-TS JS: **JSDoc** on public helpers where types are not expressed.
+
+When behavior is unclear, prefer a short plan, then implement — still keep edits minimal and testable.

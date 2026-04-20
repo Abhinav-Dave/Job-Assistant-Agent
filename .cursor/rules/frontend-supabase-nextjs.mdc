@@ -1,0 +1,20 @@
+---
+description: Supabase + Next.js client patterns (from awesome-cursorrules typescript-nextjs-supabase)
+globs: frontend/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# Frontend — Supabase with Next.js
+
+Source: [awesome-cursorrules — typescript-nextjs-supabase-cursorrules-prompt-file](https://github.com/PatrickJS/awesome-cursorrules)
+
+**Project note:** This repo uses `@supabase/supabase-js` and Tailwind. It does **not** use Shadcn/Radix by default — follow existing components and utilities; do not introduce Shadcn unless the user asks.
+
+- Functional, declarative TS; **named exports** for components; **kebab-case** for route/component folder names where consistent with the repo.
+- Prefer **interfaces** over `type` for object shapes; avoid TypeScript `enum` — use `as const` objects or unions.
+- Minimize **`use client`**, `useEffect`, and `useState` — push data loading to Server Components or server-side helpers when possible.
+- Use **Supabase client** only with env-based config (`NEXT_PUBLIC_*`); never commit secrets; respect RLS as defined in Supabase.
+- For auth/session-sensitive calls, follow the project’s existing auth flow (cookies, middleware, or server helpers).
+- Wrap async client boundaries in **Suspense** with fallbacks when using client-only trees.
+- Optimize images (Next/Image), Core Web Vitals, and avoid blocking the main thread with heavy client bundles.
+- AI features in this product may call the **FastAPI** backend; use Vercel AI SDK only if the codebase already does or the task explicitly requires it.
