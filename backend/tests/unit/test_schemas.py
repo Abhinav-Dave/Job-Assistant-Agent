@@ -288,9 +288,18 @@ def test_common_agent_error_and_health() -> None:
     )
     assert health.database == "connected"
 
+    degraded = HealthCheckResult(
+        status="degraded",
+        database="error",
+        llm="reachable",
+        version="1.0.0",
+        timestamp=ts,
+    )
+    assert degraded.status == "degraded"
+
     with pytest.raises(ValidationError):
         HealthCheckResult(
-            status="degraded",
+            status="broken",  # type: ignore[arg-type]
             database="connected",
             llm="reachable",
             version="1.0.0",

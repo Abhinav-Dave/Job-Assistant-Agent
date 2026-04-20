@@ -1,5 +1,6 @@
 # PRD Section 8 — versions pinned when locking for production
 fastapi
+python-multipart
 uvicorn[standard]
 pydantic[email]
 pydantic-settings

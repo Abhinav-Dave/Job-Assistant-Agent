@@ -2,10 +2,14 @@
 
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from settings import get_settings
+
+# `HTTPBearer` registers OpenAPI security so `/docs` "Authorize" sends `Authorization: Bearer …`.
+_bearer = HTTPBearer(auto_error=False)
 
 
 def verify_jwt(token: str) -> str:
@@ -37,19 +41,25 @@ def verify_jwt(token: str) -> str:
 
 
 async def get_current_user(
-    authorization: Annotated[str | None, Header(description="Bearer access_token")] = None,
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> str:
     """
     FastAPI dependency: Authorization: Bearer <supabase_jwt> → user_id (UUID string).
+    Use `/docs` → **Authorize** → paste the JWT only (no `Bearer ` prefix).
     """
-    if authorization is None:
+    if creds is None or not creds.credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid authorization header format",
-        )
+    return verify_jwt(creds.credentials)
+
+
+def try_get_user_id_from_authorization(authorization: str | None) -> str | None:
+    """For request logging: return `sub` when the Bearer token is valid, else None."""
+    if authorization is None or not authorization.startswith("Bearer "):
+        return None
     token = authorization[len("Bearer ") :].strip()
     if not token:
-        raise HTTPException(status_code=401, detail="Missing bearer token")
-    return verify_jwt(token)
+        return None
+    try:
+        return verify_jwt(token)
+    except HTTPException:
+        return None

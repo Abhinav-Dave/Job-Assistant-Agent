@@ -5,6 +5,14 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+class AutofillRequest(BaseModel):
+    """`POST /api/autofill` body (PRD Section 12)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    page_url: str = Field(min_length=1)
+
+
 class FormField(BaseModel):
     """Parsed HTML form control (tools/scraper) / internal use."""
 

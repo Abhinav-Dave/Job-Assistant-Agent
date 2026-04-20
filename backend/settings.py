@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_DIR = Path(__file__).resolve().parent
@@ -27,6 +28,12 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
     supabase_jwt_secret: str = ""
+
+    google_gemini_api_key: str = ""
+    gemini_model: str = Field(
+        default="gemini-2.5-flash",
+        description="GenerativeModel id; override with env GEMINI_MODEL.",
+    )
 
     environment: str = "development"
     log_level: str = "INFO"

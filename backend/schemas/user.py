@@ -73,6 +73,16 @@ class EducationItem(BaseModel):
     display_order: int = 0
 
 
+class CreateUserRequest(BaseModel):
+    """`POST /api/users` body — id must match JWT `sub` (PRD Section 12)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    email: EmailStr
+    full_name: str = Field(min_length=1)
+
+
 class UserProfile(BaseModel):
     """`GET /api/users/me` response (PRD Section 12)."""
 

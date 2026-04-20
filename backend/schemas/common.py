@@ -19,11 +19,11 @@ class AgentError(BaseModel):
 
 
 class HealthCheckResult(BaseModel):
-    """`GET /api/health` success payload."""
+    """`GET /api/health` payload (PRD Section 12, 17)."""
 
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal["ok"] = "ok"
+    status: Literal["ok", "degraded"]
     database: str
     llm: str
     version: str

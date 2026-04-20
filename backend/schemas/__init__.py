@@ -7,10 +7,12 @@ from schemas.application import (
     CreateApplicationRequest,
     UpdateApplicationRequest,
 )
-from schemas.autofill import AutofillResult, FieldMapping, FormField
+from schemas.autofill import AutofillRequest, AutofillResult, FieldMapping, FormField
 from schemas.common import AgentError, HealthCheckResult
 from schemas.resume import ResumeScoreRequest, ResumeScoreResult
+from schemas.feedback import FeedbackLoggedResult, FeedbackRequest
 from schemas.user import (
+    CreateUserRequest,
     EducationItem,
     UpdateUserRequest,
     UserPreferences,
@@ -24,9 +26,13 @@ __all__ = [
     "AnswerResult",
     "Application",
     "ApplicationStatus",
+    "AutofillRequest",
     "AutofillResult",
     "CreateApplicationRequest",
+    "CreateUserRequest",
     "EducationItem",
+    "FeedbackLoggedResult",
+    "FeedbackRequest",
     "FieldMapping",
     "FormField",
     "HealthCheckResult",
