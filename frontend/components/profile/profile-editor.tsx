@@ -48,6 +48,30 @@ const editableFields: EditableField[] = [
   },
 ];
 
+const progressWidthClassByStep: Record<number, string> = {
+  0: "w-0",
+  5: "w-[5%]",
+  10: "w-[10%]",
+  15: "w-[15%]",
+  20: "w-[20%]",
+  25: "w-1/4",
+  30: "w-[30%]",
+  35: "w-[35%]",
+  40: "w-2/5",
+  45: "w-[45%]",
+  50: "w-1/2",
+  55: "w-[55%]",
+  60: "w-3/5",
+  65: "w-[65%]",
+  70: "w-[70%]",
+  75: "w-3/4",
+  80: "w-4/5",
+  85: "w-[85%]",
+  90: "w-[90%]",
+  95: "w-[95%]",
+  100: "w-full",
+};
+
 export function ProfileEditor() {
   const { profile, updateProfileField } = usePhase10App();
 
@@ -70,6 +94,12 @@ export function ProfileEditor() {
     return Math.round((filled.length / requiredKeys.length) * 100);
   }, [profile]);
 
+  const progressWidthClass = useMemo(() => {
+    const clamped = Math.min(100, Math.max(0, profileCompleteness));
+    const stepped = Math.round(clamped / 5) * 5;
+    return progressWidthClassByStep[stepped] ?? "w-0";
+  }, [profileCompleteness]);
+
   return (
     <main className="space-y-6 p-6 md:p-8">
       <header className="space-y-3 rounded-xl border border-slate-200 bg-gradient-to-r from-white to-slate-100 p-5">
@@ -89,10 +119,7 @@ export function ProfileEditor() {
       <Card className="space-y-2">
         <p className="text-sm font-medium text-slate-700">Profile readiness</p>
         <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-          <div
-            className="h-full rounded-full bg-emerald-500 transition-all"
-            style={{ width: `${profileCompleteness}%` }}
-          />
+          <div className={`h-full rounded-full bg-emerald-500 transition-all ${progressWidthClass}`} />
         </div>
         <p className="text-sm text-slate-600">{profileCompleteness}% of core autofill fields configured.</p>
       </Card>
