@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -9,11 +10,21 @@ from uuid import UUID
 from schemas.application import Application, ApplicationStatus
 from schemas.user import EducationItem, UserPreferences, UserProfile, WorkHistoryItem
 
-try:
-    from routers.mock_profile_private import get_private_mock_profile_overrides
-except Exception:  # pragma: no cover - optional local-only file
-    def get_private_mock_profile_overrides() -> dict[str, object]:
+def get_private_mock_profile_overrides() -> dict[str, object]:
+    """Load optional local-only mock profile overrides when available."""
+    try:
+        module = import_module("routers.mock_profile_private")
+    except Exception:  # pragma: no cover - optional local-only file
         return {}
+    getter = getattr(module, "get_private_mock_profile_overrides", None)
+    if callable(getter):
+        try:
+            overrides = getter()
+        except Exception:  # pragma: no cover - local override errors shouldn't break app
+            return {}
+        if isinstance(overrides, dict):
+            return overrides
+    return {}
 
 # Stable UUIDs for nested rows (PRD examples)
 _WH_ID = UUID("11111111-1111-1111-1111-111111111111")

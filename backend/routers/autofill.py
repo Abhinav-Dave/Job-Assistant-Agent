@@ -27,8 +27,8 @@ def autofill(
     else:
         profile = mock_user_profile(
             user_id=user_id,
-            email="abhinavdave2020@gmail.com",
-            full_name="Abhinav Dave",
+            email="jane@example.com",
+            full_name="Jane Smith",
             onboarding_complete=True,
         )
     try:

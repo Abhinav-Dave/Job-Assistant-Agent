@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-04-22
 
-**Current phase:** Phase 10 — Frontend static UI with mock data
+**Current phase:** Phase 9.5 — Autofill postmortem + recovery handoff to Phase 10
 
 **API notes:**
 - **`POST /api/resume/analyze`** is wired to the real `agents.resume_scorer.analyze_resume_and_jd` (PDF or text/Markdown upload or pasted `resume_text`, plus `jd_url` and/or `jd_text`). It is no longer a fixed mock score.
@@ -23,6 +23,7 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
 - [x] **Phase 7** — Resume scorer agent
 - [x] **Phase 8** — Answer generator agent
 - [x] **Phase 9** — Autofill agent
+- [x] **Phase 9.5** — Autofill postmortem, privacy scrub, and execution-path reset
 - [ ] **Phase 10** — Frontend static UI with mock data
 - [ ] **Phase 11** — Auth + frontend integration
 - [ ] **Phase 12** — QA, polish & docs
@@ -40,6 +41,36 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
 - **Phase 8 (answer generator) — reliability & length (see `Agent_Status.md` for full issue log):** `generate_tailored_answer` uses Gemini first, Groq second, deterministic fallback only on serious LLM outage codes. Word limits: default max **300** (`ANSWER_MAX_WORDS` env override); optional **“N words”** in the question adjusts min/max. Regeneration retries for `answer_too_short`, `answer_too_long`, and quality failures. `LAST_PROVIDER_USED` / `LAST_WORD_LIMIT_MAX` and log field `llm_provider` record which backend succeeded. Prompt `answer_gen_v1.txt` targets 220–280 words. `call_gemini(..., expect_json=False)` for prose (JSON mime type was breaking non-JSON answers). Smoke script `backend/scripts/smoke_answer_gen.py` prints provider + limits.
 - **Phase 9 (autofill mapper) done:** Implemented `agents/autofill_mapper.py` with PRD flow: `map_fields_to_profile(page_url, user_profile)` scrapes fields via `tools.scraper.scrape_form_fields`, applies high-confidence rule map first (`FIELD_MAP`, confidence `0.95`), sends only unmapped fields to LLM fallback using `load_prompt("autofill_v1.txt")` + `call_gemini` + `parse_json_from_response/json fallback`, merges results, computes confidence bands (`auto_fill` >= 0.85, `suggest` 0.50–0.84, `unknown` < 0.50), returns `AutofillResult`, and raises structured `AgentError("no_fields_detected", ...)` for empty pages. Router `POST /api/autofill` now calls the agent (replacing mock) with Phase 7/8-style error mapping/logging (`422` for expected `AgentError`, `503` for `LLMError`). Added `backend/tests/unit/test_autofill.py` including mocked HTTP scrape and mocked LLM JSON fallback; verification passed: `python -m pytest backend/tests/unit/test_autofill.py -v` (4 passed). Manual sanity attempt: Greenhouse/Indeed public links were mostly non-apply or blocked pages in this environment, so observed fill-rate is not representative of true apply forms; use known live apply URLs during QA for target `fill_rate > 0.5`.
 - **Phase 9 hardening (ATS + profile quality):** Addressed major real-world autofill failures from Ashby/Oracle/Workday with layered scraper recovery (`static -> rendered -> interactive Playwright DOM`), session-aware progression clicks (`Apply/Continue/Next`), iframe/shadow-root extraction, low-signal guardrails, and stronger diagnostics (`ats_page_not_ready` vs `no_fields_detected`). Added interactive retry in mapper when first pass fails expected ATS errors. Hardened LLM fallback parsing to degrade gracefully on malformed JSON instead of failing whole requests. Added optional request-body `profile` override for `/api/autofill` and expanded profile schema + mappings for address-grade fields (`address_line1/2`, `city`, `province/state`, `country`, `postal/zip`) with updated defaults for current user profile data. Validation and smoke outcomes are logged in `Agent_Status.md` rows #16–#17 and Phase 9 reference section.
+- **Phase 9.5 postmortem (requested reset):** Autofill mapping quality improved, but true "live fill" reliability remained below bar because backend Playwright runs in a separate session and cannot consistently share the user's authenticated in-browser state (especially Workday-style auth gates and multi-step dynamic forms). This created repeated UX friction despite extraction gains. Privacy cleanup completed: personal literals removed from tracked code/tests; local-only profile remains in gitignored `backend/routers/mock_profile_private.py`. Product direction is now explicit:
+  - Keep backend autofill as **mapping + scoring + diagnostics**.
+  - Implement real **in-browser execution** via extension/content script (same session as user).
+  - Load profile from persisted source first (not hardcoded fallback), with clear auth/session state.
+  - Ship Phase 10 UI as stable preview/control plane, then Phase 11 integration for website + extension handoff.
+
+## Phase 9.5: Failure Log and Forward Plan
+
+### What went wrong
+- Backend-only execution was treated like live browser autofill, but session/auth context did not match user browser reality.
+- ATS auth gates and multi-step flows caused repeated false starts even when extraction succeeded.
+- Iteration velocity on fixes was high, but confidence for "works every time in real apply flow" stayed low.
+- Personal test data appeared in tracked files during debugging and had to be scrubbed.
+
+### What is now stable
+- Field extraction is materially stronger (static + rendered + interactive + iframe/shadow traversal).
+- Mapper confidence bands and diagnostics are useful for UI surfacing and manual correction.
+- Structured error taxonomy exists (`no_fields_detected`, `ats_page_not_ready`, etc.).
+- Personal data is now restricted to local gitignored override file.
+
+### What user wants (explicit target)
+- Open jobs in browser and have autofill **actually fill** in live pages, not just preview mappings.
+- Use extension + website together: website as dashboard/control plane, extension as in-page executor.
+- Track applications end-to-end (status, history, notes, follow-ups) with minimal manual duplication.
+- Robust auth/profile loading so user context is ready by default across sessions/devices.
+
+### Execution plan from here
+- Phase 10: static frontend that mirrors real workflows (dashboard, autofill preview, profile, app tracker).
+- Phase 11: auth + profile persistence integration first, then extension bridge for in-page fill execution.
+- Extension architecture: content script detects fields, requests mappings from backend, applies fills in current authenticated tab, and returns per-field success/failure telemetry.
 
 ### Phase 4 verification issues and fixes (for future reference)
 

@@ -23,6 +23,7 @@ Append a new entry after each agent task or phase. PRD reference: Section 20 (Ag
 | 15 | 2026-04-21 | 9 | `agents/autofill_mapper.py`, `routers/autofill.py`, `tests/unit/test_autofill.py`, `status.md`, `Agent_Status.md` | **Phase 9 implementation complete:** built `map_fields_to_profile(page_url, user_profile)` with rule-first `FIELD_MAP` (confidence `0.95`), LLM fallback only for unmapped fields via `load_prompt("autofill_v1.txt")` + `call_gemini`, merge and confidence bands (`auto_fill`, `suggest`, `unknown`), structured `AgentError("no_fields_detected")`, and Phase 7/8-style structured logs. Wired `POST /api/autofill` to agent path with `422` mapping for expected `AgentError` and `503` for `LLMError` (replacing mock response). Added unit coverage with mocked HTTP form extraction + mocked LLM JSON fallback; verified with `python -m pytest backend/tests/unit/test_autofill.py -v` (4 passed). Manual sanity on public Greenhouse/Indeed links: pages were non-apply/blocked in this environment, so fill-rate observations are noted as non-representative and should be rechecked against known live apply URLs in QA. | Done |
 | 16 | 2026-04-21 | 9 hardening | `tools/scraper.py`, `agents/autofill_mapper.py`, `routers/autofill.py`, `schemas/autofill.py`, `tests/unit/test_scraper.py`, `tests/unit/test_autofill.py`, `tests/unit/test_schemas.py` | **Autofill ATS hardening + interactive recovery:** fixed repeated 422s on Ashby/Oracle/Workday by changing from static-only assumptions to layered extraction + session-aware progression. Added JS-rendered fallback, deep Playwright extraction (iframes + shadow DOM), progression clicks (`Apply Manually` / `Apply` / `Continue` / `Next`) with waits, and dedupe. Route was kept synchronous to align with sync Playwright path. Added `ats_page_not_ready` taxonomy and tuned meaningful/junk filters (including Oracle `oda-work-summary` variants). Hardened LLM fallback parsing to handle list/dict payloads and gracefully degrade on malformed JSON so rule mappings still return. Added forced interactive retry path in `map_fields_to_profile` for `ats_page_not_ready`/`no_fields_detected`, preserving original diagnosis if interactive retry also fails. Added low-signal heuristic so scraper does not prematurely return junk controls. Added optional request profile in `/api/autofill` so real profile can be injected without editing code. Unit suites green after each step; live smoke on provided URLs returned non-422 structured results (`Ashby 37/4`, `Oracle 2/1`, `Workday 14/4` mapped). | Done |
 | 17 | 2026-04-21 | 9 personalization | `schemas/user.py`, `routers/mock_data.py`, `agents/autofill_mapper.py`, `tests/unit/test_autofill.py` | **Address-grade autofill coverage update:** user-reported misses (`last name`, address lines, province/state, country, postal code) traced to profile model lacking dedicated address fields and mapper relying on coarse `location`. Added `address_line1`, `address_line2`, `city`, `province`, `country`, `postal_code` to `UserProfile` and `UpdateUserRequest`; updated mock profile defaults with supplied address details. Expanded rule map aliases for address semantics (`street address`, `address line 1/2`, `suite/apartment`, `province/state`, `postal/zip`) and added province/country extractors from explicit fields with location fallback. Added regression test `test_map_fields_to_profile_maps_address_fields`. Result: stronger deterministic mapping for common ATS address fields without depending solely on LLM fallback. | Done |
+| 18 | 2026-04-22 | 9.5 postmortem | `status.md`, `Agent_Status.md`, `backend/tests/unit/test_autofill.py`, `backend/routers/autofill.py`, `backend/routers/mock_data.py` | **Phase 9.5 reset + handoff:** recorded explicit failure mode that extraction/mapping improved but backend-only execution did not consistently produce live in-browser autofill due to session/auth divergence on ATS flows. Logged required architecture pivot: website backend remains mapper/diagnostics/tracker; extension/content-script must execute fills in the user's authenticated tab. Completed privacy remediation by removing personal literals from tracked tests/default route values and keeping profile details local-only in gitignored overrides. Captured next goals: profile-first loading, robust auth continuity, end-to-end application tracking, and extension + website integration in Phase 10/11. | Done |
 
 ---
 
@@ -179,6 +180,28 @@ Use this when debugging similar failures in other projects.
 
 - **Unit tests:** touched suites passed after each fix iteration.
 - **Real-link smoke:** provided ATS URLs returned structured non-422 outputs with partial-but-improved mapping counts; remaining gaps are site-specific semantics and not transport/extraction hard failures.
+
+---
+
+## Phase 9.5 — Postmortem (requested)
+
+### Why this still failed user expectations
+- Backend extraction and mapping got better, but user success metric was real in-page autofill in the same browser session.
+- Backend Playwright ran in a separate context, so ATS auth/session state often diverged from what user saw in-tab.
+- Outcome mismatch: diagnostics and previews improved; "fills live forms reliably" did not.
+
+### Main friction points
+- Auth-gated ATS routes looked intermittently like application pages depending on state/timing.
+- Multi-step dynamic forms required progression actions before fields existed.
+- Repeated retries and guardrail tuning increased complexity without delivering dependable end-user execution.
+- Personal literals appeared in tracked fixtures during debugging and required cleanup.
+
+### Forward target (explicit user ask)
+- Website + extension architecture:
+  - Website/backend: profile, mapping, diagnostics, app tracking.
+  - Extension/content script: true live autofill in authenticated tab.
+- Profile-first behavior by default (no brittle hardcoded identity in tracked code).
+- Better auth/session continuity and cleaner end-to-end flow from "open job" to "filled + tracked application."
 
 ---
 

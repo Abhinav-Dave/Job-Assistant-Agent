@@ -208,12 +208,12 @@ def test_map_fields_to_profile_maps_address_fields(monkeypatch) -> None:
     ]
     profile = _build_profile().model_copy(
         update={
-            "full_name": "Abhinav Dave",
-            "address_line1": "16 Kingswood Drive",
-            "city": "Brampton",
-            "province": "Ontario",
+            "full_name": "Alex Doe",
+            "address_line1": "123 Example Street",
+            "city": "Sampletown",
+            "province": "State",
             "country": "Canada",
-            "postal_code": "L6V 2T6",
+            "postal_code": "A1A 1A1",
         }
     )
     monkeypatch.setattr(autofill_mapper, "scrape_form_fields", lambda _url: fields)
@@ -221,8 +221,8 @@ def test_map_fields_to_profile_maps_address_fields(monkeypatch) -> None:
     result = autofill_mapper.map_fields_to_profile("https://jobs.example/address", profile)
     mapped = {m.field_id: m.suggested_value for m in result.mappings}
 
-    assert mapped["last_name"] == "Dave"
-    assert mapped["address1"] == "16 Kingswood Drive"
-    assert mapped["postal"] == "L6V 2T6"
-    assert mapped["province"] == "Ontario"
+    assert mapped["last_name"] == "Doe"
+    assert mapped["address1"] == "123 Example Street"
+    assert mapped["postal"] == "A1A 1A1"
+    assert mapped["province"] == "State"
     assert mapped["country"] == "Canada"
