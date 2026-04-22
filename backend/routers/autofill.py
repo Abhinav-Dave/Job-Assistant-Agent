@@ -1,33 +1,53 @@
 """POST /api/autofill (PRD Section 12)."""
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 
+from agents.autofill_mapper import AgentError as AutofillAgentError
+from agents.autofill_mapper import map_fields_to_profile
+from exceptions import JsonHttpError
 from middleware.auth import get_current_user
-from schemas.autofill import AutofillRequest, AutofillResult, FieldMapping
+from routers.mock_data import mock_user_profile
+from schemas.autofill import AutofillRequest, AutofillResult
+from schemas.common import AgentError
+from services.llm import LLMError
 
 router = APIRouter(tags=["autofill"])
 
 
 @router.post("/autofill", response_model=AutofillResult)
-async def autofill(
+def autofill(
     body: AutofillRequest,
     user_id: str = Depends(get_current_user),
 ) -> AutofillResult:
-    """Autofill mapper — Phase 4 mock."""
-    _ = user_id, body.page_url
-    return AutofillResult(
-        fill_rate=0.82,
-        total_fields=17,
-        mapped_fields=14,
-        mappings=[
-            FieldMapping(
-                field_id="FirstName",
-                field_label="First Name",
-                field_type="text",
-                profile_key="full_name",
-                suggested_value="Jane",
-                confidence=0.97,
-            )
-        ],
-        unfilled_fields=["cover_letter", "salary_expectation_text"],
-    )
+    """Run autofill mapper (rule-based + LLM fallback on only unmapped fields)."""
+    if body.profile is not None:
+        profile = body.profile.model_copy(update={"id": UUID(user_id)})
+    else:
+        profile = mock_user_profile(
+            user_id=user_id,
+            email="abhinavdave2020@gmail.com",
+            full_name="Abhinav Dave",
+            onboarding_complete=True,
+        )
+    try:
+        return map_fields_to_profile(body.page_url.strip(), profile)
+    except AutofillAgentError as exc:
+        raise JsonHttpError(
+            422,
+            {
+                "error": exc.error,
+                "message": exc.message,
+                "detail": exc.detail,
+            },
+        ) from exc
+    except LLMError as exc:
+        raise JsonHttpError(
+            503,
+            AgentError(
+                error=exc.code,
+                message=str(exc),
+                detail=None,
+            ).model_dump(),
+        ) from exc

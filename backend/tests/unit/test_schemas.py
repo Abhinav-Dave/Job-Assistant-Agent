@@ -16,6 +16,7 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
+from routers.mock_data import mock_user_profile
 from schemas.answer import AnswerRequest, AnswerResult
 from schemas.application import (
     Application,
@@ -23,7 +24,7 @@ from schemas.application import (
     CreateApplicationRequest,
     UpdateApplicationRequest,
 )
-from schemas.autofill import AutofillResult, FieldMapping, FormField
+from schemas.autofill import AutofillRequest, AutofillResult, FieldMapping, FormField
 from schemas.common import AgentError, HealthCheckResult
 from schemas.resume import ResumeScoreRequest, ResumeScoreResult
 from schemas.user import EducationItem, UpdateUserRequest, UserPreferences, UserProfile, WorkHistoryItem
@@ -300,6 +301,20 @@ def test_autofill_and_form_field() -> None:
             suggested_value="v",
             confidence=1.5,
         )
+
+    req = AutofillRequest(page_url="https://jobs.example/apply")
+    assert req.profile is None
+
+    req_with_profile = AutofillRequest(
+        page_url="https://jobs.example/apply",
+        profile=mock_user_profile(
+            user_id="550e8400-e29b-41d4-a716-446655440000",
+            email="jane@example.com",
+            full_name="Jane Smith",
+            onboarding_complete=True,
+        ),
+    )
+    assert req_with_profile.profile is not None
 
 
 def test_common_agent_error_and_health() -> None:

@@ -1,8 +1,8 @@
 # Project status
 
-**Last updated:** 2026-04-20
+**Last updated:** 2026-04-22
 
-**Current phase:** Phase 9 — Autofill agent (PRD Section 21)
+**Current phase:** Phase 10 — Frontend static UI with mock data
 
 **API notes:**
 - **`POST /api/resume/analyze`** is wired to the real `agents.resume_scorer.analyze_resume_and_jd` (PDF or text/Markdown upload or pasted `resume_text`, plus `jd_url` and/or `jd_text`). It is no longer a fixed mock score.
@@ -22,7 +22,7 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
 - [x] **Phase 6** — Gemini LLM service
 - [x] **Phase 7** — Resume scorer agent
 - [x] **Phase 8** — Answer generator agent
-- [ ] **Phase 9** — Autofill agent
+- [x] **Phase 9** — Autofill agent
 - [ ] **Phase 10** — Frontend static UI with mock data
 - [ ] **Phase 11** — Auth + frontend integration
 - [ ] **Phase 12** — QA, polish & docs
@@ -38,6 +38,8 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
 - **Phase 7 (resume scorer agent) done:** Implemented `agents/resume_scorer.py` full PRD flow for `analyze_resume_and_jd(resume_source, jd_source, user_id)` with source resolution (PDF/text + URL/text), expected structured agent failures (`pdf_no_text`, `jd_scrape_failed`, `resume_too_short`, `jd_too_short`), input truncation guards, prompt loading via `resume_score_v1.txt`, Gemini invocation, JSON parsing + `ResumeScoreResult` validation, and one retry using a correction prompt on JSON/schema failure. Added logging hooks (agent_name, user_id, duration_ms, score, token placeholders, success/failure) and targeted unit tests in `tests/unit/test_resume_scorer.py`; verification command passed: `python -m pytest backend/tests/unit/test_resume_scorer.py -v`.
 - **Resume analyze route:** `backend/routers/resume.py` calls the scorer agent (not mock data). Uploads: `.pdf` or magic bytes `%PDF` → PDF extraction; other files (e.g. `.md`, `.txt`) → UTF-8/Latin-1 text. If both `jd_url` and `jd_text` are sent, **URL is used** (scraped JD). Requires auth (`Authorization: Bearer`); use `python backend/mint_dev_jwt.py` locally.
 - **Phase 8 (answer generator) — reliability & length (see `Agent_Status.md` for full issue log):** `generate_tailored_answer` uses Gemini first, Groq second, deterministic fallback only on serious LLM outage codes. Word limits: default max **300** (`ANSWER_MAX_WORDS` env override); optional **“N words”** in the question adjusts min/max. Regeneration retries for `answer_too_short`, `answer_too_long`, and quality failures. `LAST_PROVIDER_USED` / `LAST_WORD_LIMIT_MAX` and log field `llm_provider` record which backend succeeded. Prompt `answer_gen_v1.txt` targets 220–280 words. `call_gemini(..., expect_json=False)` for prose (JSON mime type was breaking non-JSON answers). Smoke script `backend/scripts/smoke_answer_gen.py` prints provider + limits.
+- **Phase 9 (autofill mapper) done:** Implemented `agents/autofill_mapper.py` with PRD flow: `map_fields_to_profile(page_url, user_profile)` scrapes fields via `tools.scraper.scrape_form_fields`, applies high-confidence rule map first (`FIELD_MAP`, confidence `0.95`), sends only unmapped fields to LLM fallback using `load_prompt("autofill_v1.txt")` + `call_gemini` + `parse_json_from_response/json fallback`, merges results, computes confidence bands (`auto_fill` >= 0.85, `suggest` 0.50–0.84, `unknown` < 0.50), returns `AutofillResult`, and raises structured `AgentError("no_fields_detected", ...)` for empty pages. Router `POST /api/autofill` now calls the agent (replacing mock) with Phase 7/8-style error mapping/logging (`422` for expected `AgentError`, `503` for `LLMError`). Added `backend/tests/unit/test_autofill.py` including mocked HTTP scrape and mocked LLM JSON fallback; verification passed: `python -m pytest backend/tests/unit/test_autofill.py -v` (4 passed). Manual sanity attempt: Greenhouse/Indeed public links were mostly non-apply or blocked pages in this environment, so observed fill-rate is not representative of true apply forms; use known live apply URLs during QA for target `fill_rate > 0.5`.
+- **Phase 9 hardening (ATS + profile quality):** Addressed major real-world autofill failures from Ashby/Oracle/Workday with layered scraper recovery (`static -> rendered -> interactive Playwright DOM`), session-aware progression clicks (`Apply/Continue/Next`), iframe/shadow-root extraction, low-signal guardrails, and stronger diagnostics (`ats_page_not_ready` vs `no_fields_detected`). Added interactive retry in mapper when first pass fails expected ATS errors. Hardened LLM fallback parsing to degrade gracefully on malformed JSON instead of failing whole requests. Added optional request-body `profile` override for `/api/autofill` and expanded profile schema + mappings for address-grade fields (`address_line1/2`, `city`, `province/state`, `country`, `postal/zip`) with updated defaults for current user profile data. Validation and smoke outcomes are logged in `Agent_Status.md` rows #16–#17 and Phase 9 reference section.
 
 ### Phase 4 verification issues and fixes (for future reference)
 

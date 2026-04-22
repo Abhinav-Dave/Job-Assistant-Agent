@@ -135,3 +135,69 @@ def test_scrape_form_fields_returns_empty_on_failure(monkeypatch) -> None:
 
     monkeypatch.setattr("tools.scraper.httpx.get", _mock_get)
     assert scrape_form_fields("https://timeout.example") == []
+
+
+def test_scrape_form_fields_uses_js_fallback_when_static_empty(monkeypatch) -> None:
+    static_html = "<html><body><div>app shell without fields</div></body></html>"
+    rendered_html = """
+    <html><body>
+      <form>
+        <label for="first_name">First Name</label>
+        <input id="first_name" name="first_name" type="text" />
+      </form>
+    </body></html>
+    """
+
+    monkeypatch.setattr("tools.scraper._get_html", lambda _url: static_html)
+    monkeypatch.setattr("tools.scraper._get_rendered_html", lambda _url: rendered_html)
+
+    fields = scrape_form_fields("https://dynamic.example/apply")
+    assert len(fields) == 1
+    assert fields[0].field_id == "first_name"
+    assert fields[0].label == "First Name"
+
+
+def test_scrape_form_fields_skips_js_fallback_when_static_has_fields(monkeypatch) -> None:
+    static_html = """
+    <html><body>
+      <form>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" />
+      </form>
+    </body></html>
+    """
+    called = {"render": 0}
+
+    def _rendered(_url: str) -> str:
+        called["render"] += 1
+        return ""
+
+    monkeypatch.setattr("tools.scraper._get_html", lambda _url: static_html)
+    monkeypatch.setattr("tools.scraper._get_rendered_html", _rendered)
+
+    fields = scrape_form_fields("https://static.example/apply")
+    assert len(fields) == 1
+    assert fields[0].field_id == "email"
+    assert called["render"] == 0
+
+
+def test_scrape_form_fields_uses_playwright_dom_extractor_last(monkeypatch) -> None:
+    monkeypatch.setattr("tools.scraper._get_html", lambda _url: "<html><body></body></html>")
+    monkeypatch.setattr("tools.scraper._get_rendered_html", lambda _url: "<html><body></body></html>")
+    monkeypatch.setattr(
+        "tools.scraper._extract_form_controls_via_playwright",
+        lambda _url: [
+            {
+                "field_id": "oracle_first_name",
+                "name": "oracle_first_name",
+                "label": "First Name",
+                "field_type": "text",
+                "placeholder": None,
+            }
+        ],
+    )
+
+    fields = scrape_form_fields("https://oracle.example/apply")
+    assert len(fields) == 1
+    assert fields[0].field_id == "oracle_first_name"
+    assert fields[0].label == "First Name"

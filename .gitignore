@@ -220,3 +220,9 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Local-only personal profile overrides
+backend/routers/mock_profile_private.py
+
+# Cursor project rules (local IDE guidance)
+.cursor/rules/

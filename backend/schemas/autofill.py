@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from schemas.user import UserProfile
+
 
 class AutofillRequest(BaseModel):
     """`POST /api/autofill` body (PRD Section 12)."""
@@ -11,6 +13,7 @@ class AutofillRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     page_url: str = Field(min_length=1)
+    profile: UserProfile | None = None
 
 
 class FormField(BaseModel):

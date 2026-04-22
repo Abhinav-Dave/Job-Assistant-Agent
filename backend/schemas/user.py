@@ -119,6 +119,12 @@ class UserProfile(BaseModel):
     full_name: str = Field(min_length=1)
     phone: str | None = None
     location: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    city: str | None = None
+    province: str | None = None
+    country: str | None = None
+    postal_code: str | None = None
     linkedin_url: str | None = None
     portfolio_url: str | None = None
     skills: list[str] = Field(default_factory=list)
@@ -139,6 +145,12 @@ class UpdateUserRequest(BaseModel):
     full_name: str | None = Field(default=None, min_length=1)
     phone: str | None = None
     location: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    city: str | None = None
+    province: str | None = None
+    country: str | None = None
+    postal_code: str | None = None
     linkedin_url: str | None = None
     portfolio_url: str | None = None
     skills: list[str] | None = None

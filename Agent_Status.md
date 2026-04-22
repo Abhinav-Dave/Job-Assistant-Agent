@@ -20,6 +20,9 @@ Append a new entry after each agent task or phase. PRD reference: Section 20 (Ag
 | 12 | 2026-04-20 | 7–8 + routes | `answer_generator.py`, `llm.py`, `routers/resume.py`, prompts, `test_answer_gen.py`, `test_llm_service.py`, `status.md`, `Agent_Status.md` | Answer-gen hardening: 300-word default cap, `answer_too_long` retries, `resolve_word_limits` + `ANSWER_MAX_WORDS`, Gemini→Groq→fallback chain, `llm_provider` logging + `LAST_PROVIDER_USED`. **`POST /api/resume/analyze` wired to real `analyze_resume_and_jd`** (PDF + text/Markdown file detection, `jd_url` scrape). Fixed `test_llm_service` to mock `_build_gemini_clients`. Added this detailed reference section below. | Done |
 | 13 | 2026-04-20 | 6–8 + scraper + answers | `llm.check_llm_reachable`, `resume_scorer._call_llm_json`, `tools/scraper.py`, `routers/resume.py`, `routers/answers.py`, `schemas/answer.py` | **Operational fixes:** Health LLM ping switched to short prose (`expect_json=False`) + **Groq second** so `/api/health` is not false-negative when Gemini returns empty JSON ping. **Resume scorer** uses same **Gemini→Groq JSON** failover as answer gen on `llm_unavailable` / `llm_empty_response`. **JD:** `best_effort_jd_text` (URL then pasted fallback), JSON-LD `JobPosting` + `data-automation` selectors + longer HTTP timeout for ATS pages; resume + answer routes use merged JD. **`POST /api/generate/answer`** calls real `generate_tailored_answer` with optional `profile` body field (defaults to mock profile). Tests: `test_analyze_resume_and_jd_falls_back_to_groq_when_gemini_overloaded`, JSON-LD scrape test, `best_effort_jd_text` test. | Done |
 | 14 | 2026-04-20 | 6–8 + schemas + docs | `schemas/user.py`, `services/llm.py`, `settings.py`, `tests/unit/test_schemas.py`, `tests/unit/test_llm_service.py`, `.env.example`, `status.md`, this file | **Integration hardening (manual API / Swagger / Gemini):** (1) **`WorkHistoryItem` dates** — Pydantic required `YYYY-MM`; OpenAPI/Swagger prefilled `"string"` → 422. **Fix:** `mode="before"` validators `_coerce_year_month` / `_coerce_end_date`: accept `YYYY-MM-DD` → month; treat `end_date` placeholders (`"string"`, `"null"`, empty) as `None`; explicit error for `start_date` mentioning Swagger. (2) **`POST /api/generate/answer` contract** — users sent `UserProfile` at JSON root → `missing question`, `extra_forbidden` on profile fields. **Doc:** body is `AnswerRequest`: `question`, `jd_text` and/or `jd_url`, optional nested `profile`. (3) **Malformed JSON** — single `}` at end closed only `profile`, not root → `json_invalid` / “Expecting ',' delimiter”. **Doc:** closing `}` for `profile` plus `}` for root; avoid smart quotes; no trailing commas. (4) **`jd_url: "string"`** — use `null` or omit. (5) **Gemini** — `503 UNAVAILABLE` / high demand is **Google-side**, not local hardware. (6) **`gemini-2.0-flash` fallback 404** — “no longer available to new users”. **Fix:** default `GEMINI_MODEL_FALLBACK` → `gemini-2.5-flash-lite`; `_extend_gemini_model_chain` appends `gemini-2.5-flash-lite` when any chain model is `gemini-2.0-flash*`; `_gemini_retryable` treats `NO LONGER AVAILABLE` like overload so third hop runs; log line “failed … retrying”. Tests: schema coercion + Swagger string error; `test_call_gemini_retries_on_overload_when_fallback_set`, `test_call_gemini_retries_after_deprecated_gemini20_404`. **47** unit tests passing at closure. | Done |
+| 15 | 2026-04-21 | 9 | `agents/autofill_mapper.py`, `routers/autofill.py`, `tests/unit/test_autofill.py`, `status.md`, `Agent_Status.md` | **Phase 9 implementation complete:** built `map_fields_to_profile(page_url, user_profile)` with rule-first `FIELD_MAP` (confidence `0.95`), LLM fallback only for unmapped fields via `load_prompt("autofill_v1.txt")` + `call_gemini`, merge and confidence bands (`auto_fill`, `suggest`, `unknown`), structured `AgentError("no_fields_detected")`, and Phase 7/8-style structured logs. Wired `POST /api/autofill` to agent path with `422` mapping for expected `AgentError` and `503` for `LLMError` (replacing mock response). Added unit coverage with mocked HTTP form extraction + mocked LLM JSON fallback; verified with `python -m pytest backend/tests/unit/test_autofill.py -v` (4 passed). Manual sanity on public Greenhouse/Indeed links: pages were non-apply/blocked in this environment, so fill-rate observations are noted as non-representative and should be rechecked against known live apply URLs in QA. | Done |
+| 16 | 2026-04-21 | 9 hardening | `tools/scraper.py`, `agents/autofill_mapper.py`, `routers/autofill.py`, `schemas/autofill.py`, `tests/unit/test_scraper.py`, `tests/unit/test_autofill.py`, `tests/unit/test_schemas.py` | **Autofill ATS hardening + interactive recovery:** fixed repeated 422s on Ashby/Oracle/Workday by changing from static-only assumptions to layered extraction + session-aware progression. Added JS-rendered fallback, deep Playwright extraction (iframes + shadow DOM), progression clicks (`Apply Manually` / `Apply` / `Continue` / `Next`) with waits, and dedupe. Route was kept synchronous to align with sync Playwright path. Added `ats_page_not_ready` taxonomy and tuned meaningful/junk filters (including Oracle `oda-work-summary` variants). Hardened LLM fallback parsing to handle list/dict payloads and gracefully degrade on malformed JSON so rule mappings still return. Added forced interactive retry path in `map_fields_to_profile` for `ats_page_not_ready`/`no_fields_detected`, preserving original diagnosis if interactive retry also fails. Added low-signal heuristic so scraper does not prematurely return junk controls. Added optional request profile in `/api/autofill` so real profile can be injected without editing code. Unit suites green after each step; live smoke on provided URLs returned non-422 structured results (`Ashby 37/4`, `Oracle 2/1`, `Workday 14/4` mapped). | Done |
+| 17 | 2026-04-21 | 9 personalization | `schemas/user.py`, `routers/mock_data.py`, `agents/autofill_mapper.py`, `tests/unit/test_autofill.py` | **Address-grade autofill coverage update:** user-reported misses (`last name`, address lines, province/state, country, postal code) traced to profile model lacking dedicated address fields and mapper relying on coarse `location`. Added `address_line1`, `address_line2`, `city`, `province`, `country`, `postal_code` to `UserProfile` and `UpdateUserRequest`; updated mock profile defaults with supplied address details. Expanded rule map aliases for address semantics (`street address`, `address line 1/2`, `suite/apartment`, `province/state`, `postal/zip`) and added province/country extractors from explicit fields with location fallback. Added regression test `test_map_fields_to_profile_maps_address_fields`. Result: stronger deterministic mapping for common ATS address fields without depending solely on LLM fallback. | Done |
 
 ---
 
@@ -110,6 +113,72 @@ Use this when debugging similar failures in other projects.
 - **Symptom:** Accidental literal resume text “string” sent alongside PDF.
 - **Root cause:** Swagger / curl placeholder.
 - **Fix:** Omit `resume_text` when uploading `resume_file`, or paste real text — not the word `string`.
+
+---
+
+## Phase 9 — Issue & fix reference (autofill + ATS)
+
+### 1. `422 no_fields_detected` on real ATS pages even when fields were visible in browser
+
+- **Symptom:** User could see fields on Ashby/Oracle/Workday URLs, but API returned 422 with no fields.
+- **Root cause:** Static HTTP scrape path often missed JS-rendered controls and ATS multi-step flows.
+- **Fix:** Added multi-layer extraction in `tools/scraper.py`:
+  - static HTML parse
+  - JS-rendered HTML fallback
+  - live Playwright DOM extraction scanning main frame + iframes + shadow roots
+
+### 2. Multi-step ATS forms required interaction before controls existed
+
+- **Symptom:** Workday/Oracle pages frequently rendered only landing controls until users clicked forward actions.
+- **Root cause:** Extraction happened before session-dependent steps were progressed.
+- **Fix:** Added session-aware progression clicks in Playwright path with selectors for `applyManually`, `Apply`, `Continue`, `Next`, plus post-click waits and repeated extraction attempts.
+
+### 3. Endpoint/runtime mismatch around Playwright execution
+
+- **Symptom:** Browser fallback behavior was inconsistent under API route execution.
+- **Root cause:** Sync Playwright path invoked inside async endpoint context.
+- **Fix:** `POST /api/autofill` route changed to sync `def` so sync Playwright execution remains stable in server context.
+
+### 4. Wrong error semantics on ATS pages with junk controls
+
+- **Symptom:** Some pages had controls (`Copy Link`, Oracle summary widgets) but not meaningful application fields, yet diagnostics were ambiguous.
+- **Root cause:** No distinct taxonomy between zero controls and not-ready controls.
+- **Fix:** Added `AgentError("ats_page_not_ready")` when controls exist but meaningful filters fail; kept `no_fields_detected` for truly empty extracts.
+
+### 5. Meaningful field filter too strict / junk list too narrow
+
+- **Symptom:** Valid forms were sometimes classified as non-meaningful.
+- **Root cause:** Early meaningful hints and junk snippets were incomplete.
+- **Fix:** Expanded hints (first/last name variants, postal/zip, province/state/country) and junk snippets (including Oracle `oda-work-summary` variants).
+
+### 6. LLM fallback parse failures crashed mapping path
+
+- **Symptom:** Truncated or malformed model JSON raised parse errors and aborted response.
+- **Root cause:** Strict parse path assumed well-formed JSON output.
+- **Fix:** Parse order hardened (`json.loads` then `parse_json_from_response`); if still invalid, gracefully degrade by preserving rule mappings and marking remaining fields unknown.
+
+### 7. Interactive browser pass was skipped when low-signal controls existed
+
+- **Symptom:** Scraper returned early with junk-like controls and never reached deep interactive extraction.
+- **Root cause:** Any non-empty scrape result was treated as success.
+- **Fix:** Added low-signal heuristic in scraper; when controls look like UI chrome, force interactive extraction path.
+
+### 8. Need real profile injection without editing source on every test
+
+- **Symptom:** Autofill appeared tied to mock profile.
+- **Root cause:** Request schema initially had no profile override.
+- **Fix:** Added optional nested `profile` in `AutofillRequest`; router now uses request profile when provided and falls back to mock only when omitted.
+
+### 9. Address field mapping gaps (last name, address lines, province/state, postal code)
+
+- **Symptom:** User-reported common address fields remained unfilled.
+- **Root cause:** `UserProfile` lacked dedicated address fields; mapper mainly used `location`.
+- **Fix:** Added `address_line1`, `address_line2`, `city`, `province`, `country`, `postal_code` to schema and update request model; expanded deterministic `FIELD_MAP` aliases and extraction helpers; updated mock profile defaults with supplied user address; added regression tests.
+
+### 10. Verification outcome after hardening
+
+- **Unit tests:** touched suites passed after each fix iteration.
+- **Real-link smoke:** provided ATS URLs returned structured non-422 outputs with partial-but-improved mapping counts; remaining gaps are site-specific semantics and not transport/extraction hard failures.
 
 ---
 
