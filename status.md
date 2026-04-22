@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-04-22
 
-**Current phase:** Phase 9.5 — Autofill postmortem + recovery handoff to Phase 10
+**Current phase:** Phase 10 complete — frontend static control-plane shipped; handoff to Phase 11 integration
 
 **API notes:**
 - **`POST /api/resume/analyze`** is wired to the real `agents.resume_scorer.analyze_resume_and_jd` (PDF or text/Markdown upload or pasted `resume_text`, plus `jd_url` and/or `jd_text`). It is no longer a fixed mock score.
@@ -24,7 +24,7 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
 - [x] **Phase 8** — Answer generator agent
 - [x] **Phase 9** — Autofill agent
 - [x] **Phase 9.5** — Autofill postmortem, privacy scrub, and execution-path reset
-- [ ] **Phase 10** — Frontend static UI with mock data
+- [x] **Phase 10** — Frontend static UI with mock data
 - [ ] **Phase 11** — Auth + frontend integration
 - [ ] **Phase 12** — QA, polish & docs
 
@@ -46,6 +46,7 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
   - Implement real **in-browser execution** via extension/content script (same session as user).
   - Load profile from persisted source first (not hardcoded fallback), with clear auth/session state.
   - Ship Phase 10 UI as stable preview/control plane, then Phase 11 integration for website + extension handoff.
+- **Phase 10 (frontend static control plane) done:** Replaced placeholder app pages with functional static UX in `frontend/` using typed contracts and mock adapters aligned to backend payloads. Added `(app)` shell navigation + shared state container (`context/phase10-app-context.tsx`), profile editor with address fields and visible work/education sections, autofill preview workspace with diagnostics (`no_fields_detected`, `ats_page_not_ready`, `low_confidence`) and per-field override editing, application tracker dashboard with status/history/notes, and jobs action panel with explicit split between “Run mapping” and “Open extension to execute fill.” Added typed service stubs (`services/api.ts`) and centralized mock datasets (`lib/phase10-mock-data.ts`) as temporary Phase 10 data sources to be swapped in Phase 11. Frontend validation passed (`npm run lint`, `npm run build`) after strict TS fix in profile field typing.
 
 ## Phase 9.5: Failure Log and Forward Plan
 
@@ -71,6 +72,12 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
 - Phase 10: static frontend that mirrors real workflows (dashboard, autofill preview, profile, app tracker).
 - Phase 11: auth + profile persistence integration first, then extension bridge for in-page fill execution.
 - Extension architecture: content script detects fields, requests mappings from backend, applies fills in current authenticated tab, and returns per-field success/failure telemetry.
+
+### Phase 11 integration focus (next)
+- Replace Phase 10 mock adapters with authenticated API fetches for profile, applications, and mapping runs.
+- Source logged-in profile from backend user context (local dev private overrides in `backend/routers/mock_profile_private.py`), not hardcoded frontend mocks.
+- Introduce extension bridge contract/events so mapping previews and in-tab execution telemetry share one state model.
+- Keep extension code isolated from `frontend/` in a separate root folder (e.g. `extension/`) while sharing typed contracts where needed.
 
 ### Phase 4 verification issues and fixes (for future reference)
 
