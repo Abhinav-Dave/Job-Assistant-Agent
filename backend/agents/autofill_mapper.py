@@ -117,6 +117,23 @@ def _extract_country(profile: UserProfile) -> str | None:
     return None
 
 
+def _extract_phone_country_code(profile: UserProfile) -> str | None:
+    phone = (profile.phone or "").strip()
+    if not phone:
+        return None
+    if phone.startswith("+"):
+        digits = []
+        for ch in phone[1:]:
+            if ch.isdigit() and len(digits) < 3:
+                digits.append(ch)
+            else:
+                break
+        if digits:
+            return f"+{''.join(digits)}"
+    # Default North America code if no explicit + prefix is available.
+    return "+1"
+
+
 def _calculate_years_experience(profile: UserProfile) -> str | None:
     if not profile.work_history:
         return None
@@ -136,11 +153,18 @@ def _calculate_years_experience(profile: UserProfile) -> str | None:
 
 FIELD_MAP: dict[str, tuple[str | None, ProfileExtractor | None]] = {
     "first name": ("full_name", _extract_first_name),
+    "first": ("full_name", _extract_first_name),
     "firstname": ("full_name", _extract_first_name),
     "given name": ("full_name", _extract_first_name),
+    "given": ("full_name", _extract_first_name),
+    "forename": ("full_name", _extract_first_name),
+    "legal first name": ("full_name", _extract_first_name),
     "last name": ("full_name", _extract_last_name),
+    "last": ("full_name", _extract_last_name),
     "lastname": ("full_name", _extract_last_name),
     "family name": ("full_name", _extract_last_name),
+    "surname": ("full_name", _extract_last_name),
+    "legal last name": ("full_name", _extract_last_name),
     "full name": ("full_name", lambda p: p.full_name),
     "name": ("full_name", lambda p: p.full_name),
     "email": ("email", lambda p: p.email),
@@ -148,6 +172,11 @@ FIELD_MAP: dict[str, tuple[str | None, ProfileExtractor | None]] = {
     "phone": ("phone", lambda p: p.phone),
     "phone number": ("phone", lambda p: p.phone),
     "mobile": ("phone", lambda p: p.phone),
+    "country phone code": ("phone", _extract_phone_country_code),
+    "phone country code": ("phone", _extract_phone_country_code),
+    "country code": ("phone", _extract_phone_country_code),
+    "phone extension": (None, None),
+    "extension": (None, None),
     "city": ("location", _extract_city),
     "address": ("address_line1", lambda p: p.address_line1),
     "address line 1": ("address_line1", lambda p: p.address_line1),
@@ -222,10 +251,10 @@ def _rule_key_for_field(field: FormField) -> str | None:
         return None
     if normalized in FIELD_MAP:
         return normalized
-    for candidate in FIELD_MAP:
-        if candidate and candidate in normalized:
-            return candidate
-    return None
+    matches = [candidate for candidate in FIELD_MAP if candidate and candidate in normalized]
+    if not matches:
+        return None
+    return max(matches, key=len)
 
 
 def _profile_key_descriptions() -> dict[str, str]:

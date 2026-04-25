@@ -1,8 +1,8 @@
 # Project status
 
-**Last updated:** 2026-04-22
+**Last updated:** 2026-04-25
 
-**Current phase:** Phase 10 complete — frontend static control-plane shipped; handoff to Phase 11 integration
+**Current phase:** Phase 11 stabilized and user-validated complete; ready for Phase 12 QA/polish
 
 **API notes:**
 - **`POST /api/resume/analyze`** is wired to the real `agents.resume_scorer.analyze_resume_and_jd` (PDF or text/Markdown upload or pasted `resume_text`, plus `jd_url` and/or `jd_text`). It is no longer a fixed mock score.
@@ -25,7 +25,7 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
 - [x] **Phase 9** — Autofill agent
 - [x] **Phase 9.5** — Autofill postmortem, privacy scrub, and execution-path reset
 - [x] **Phase 10** — Frontend static UI with mock data
-- [ ] **Phase 11** — Auth + frontend integration
+- [x] **Phase 11** — Auth + frontend integration
 - [ ] **Phase 12** — QA, polish & docs
 
 ---
@@ -47,6 +47,15 @@ Complete Phase N before starting Phase N+1. Update this file and `Agent_Status.m
   - Load profile from persisted source first (not hardcoded fallback), with clear auth/session state.
   - Ship Phase 10 UI as stable preview/control plane, then Phase 11 integration for website + extension handoff.
 - **Phase 10 (frontend static control plane) done:** Replaced placeholder app pages with functional static UX in `frontend/` using typed contracts and mock adapters aligned to backend payloads. Added `(app)` shell navigation + shared state container (`context/phase10-app-context.tsx`), profile editor with address fields and visible work/education sections, autofill preview workspace with diagnostics (`no_fields_detected`, `ats_page_not_ready`, `low_confidence`) and per-field override editing, application tracker dashboard with status/history/notes, and jobs action panel with explicit split between “Run mapping” and “Open extension to execute fill.” Added typed service stubs (`services/api.ts`) and centralized mock datasets (`lib/phase10-mock-data.ts`) as temporary Phase 10 data sources to be swapped in Phase 11. Frontend validation passed (`npm run lint`, `npm run build`) after strict TS fix in profile field typing.
+- **Phase 11 (auth + integration + extension bridge) done:** Replaced static Phase 10 adapters with authenticated API client wrappers in `frontend/services/api.ts` using Supabase session Bearer tokens and robust error handling (`ApiError`, config guards, 401 flow handling). Reworked `frontend/context/phase10-app-context.tsx` to load real profile/applications from `/api/users/me` + `/api/applications`, run real mapping preview via `/api/autofill`, persist profile updates to `/api/users/me`, persist application notes to `/api/applications/{id}`, and ingest extension telemetry into tracker state. Updated UI semantics explicitly to “Run mapping preview” vs “Execute fill in browser tab.” Added login/register session flows and root auth redirect (`frontend/app/page.tsx`, auth pages, app layout sign-out). Added shared typed bridge contracts in `frontend/types/extension-bridge.ts` and extension MVP skeleton in `extension/` (manifest, background worker, content script, popup/options, bridge README). Security hardening note: bridge auth context stored in `chrome.storage.session` rather than persistent local storage. Validation passed: `npm run lint`, `npm run build`; backend endpoint checks passed for `/api/users/me`, `/api/applications`, and live URL mapping previews (`/api/autofill` on `https://httpbin.org/forms/post` returned non-zero fields/mappings).
+- **Phase 11 stabilization (2026-04-25) done:** Closed all major post-integration blockers from live usage and debugging:
+  - **False “backend unreachable” masking fixed:** frontend fallback path no longer hides real backend API failures as generic fetch errors; API base normalization now consistently handles `localhost`/`127.0.0.1`.
+  - **Profile save fixed (backend 500):** Supabase `users` table was missing address columns in schema cache (`address_line1`, `address_line2`, `city`, `province`, `country`, `postal_code`); columns added and update handler hardened for PostgREST missing-column cache errors.
+  - **Mark complete fixed (backend 500):** `PATCH /api/applications/{id}` crashed on non-JSON-serializable `date_applied` (`date` object); update payload now uses JSON-safe serialization (`model_dump(..., mode="json")`).
+  - **Dashboard/Jobs Applied UX finalized per user request:** restored dashboard KPI cards, dashboard top-10 recent jobs, Jobs Applied all jobs with 20-per-page pagination, unified columns (`Company`, `Role`, `Link`, `Status`, `Date Applied`, `Letter Score`), and correct status/score propagation between views.
+  - **Resume score report persistence completed:** added `application_score_reports` storage + RLS migration (`supabase/migrations/008_application_score_reports.sql`), backend endpoints (`GET/PUT /api/applications/{id}/score-report`), and Jobs Applied **View Report** action.
+  - **Extension fill quality improved:** strengthened content-script semantic guardrails and candidate scoring to reduce cross-field fills (email/phone/address/city/postal mismatches) on ATS forms.
+  - **User-validated result:** profile save + mark complete now working, status flow working, and phase accepted as complete with only potential minor ATS-specific mapping refinements.
 
 ## Phase 9.5: Failure Log and Forward Plan
 

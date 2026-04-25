@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from settings import get_settings
+from services.supabase import get_supabase
 
 # `HTTPBearer` registers OpenAPI security so `/docs` "Authorize" sends `Authorization: Bearer …`.
 _bearer = HTTPBearer(auto_error=False)
@@ -32,6 +33,19 @@ def verify_jwt(token: str) -> str:
             audience="authenticated",
         )
     except JWTError as e:
+        # Newer Supabase projects may use asymmetric signing that cannot be verified
+        # with the legacy HS256 secret path. Fallback to Supabase Auth introspection.
+        try:
+            auth_client = get_supabase().auth
+            try:
+                user = auth_client.get_user(token)
+            except TypeError:
+                user = auth_client.get_user(jwt=token)
+            user_id = getattr(getattr(user, "user", None), "id", None)
+            if user_id:
+                return str(user_id)
+        except Exception:
+            pass
         raise HTTPException(status_code=401, detail=f"Token validation failed: {e}") from e
 
     user_id = payload.get("sub")

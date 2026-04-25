@@ -1,11 +1,22 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { AppShellNav } from "@/components/app/app-shell-nav";
 import { Phase10AppProvider } from "@/context/phase10-app-context";
+import { supabase } from "@/lib/supabase";
 
 export default function AppShellLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.replace("/login");
+  };
+
   return (
     <Phase10AppProvider>
       <div className="min-h-screen bg-slate-50">
@@ -14,10 +25,19 @@ export default function AppShellLayout({
             <div>
               <p className="text-base font-semibold text-slate-900">Job Assistant Control Plane</p>
               <p className="text-sm text-slate-500">
-                Phase 10 static UI (API-ready) with explicit mapping-vs-extension split.
+                Authenticated app with extension bridge handoff.
               </p>
             </div>
-            <AppShellNav />
+            <div className="flex items-center gap-2">
+              <AppShellNav />
+              <button
+                type="button"
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                onClick={() => void handleSignOut()}
+              >
+                Sign out
+              </button>
+            </div>
           </div>
         </header>
         {children}

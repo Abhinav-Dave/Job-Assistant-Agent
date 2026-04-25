@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Job Assistant</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        width: 320px;
+        margin: 0;
+        padding: 12px;
+        color: #0f172a;
+      }
+      button {
+        width: 100%;
+        margin-top: 8px;
+        padding: 8px 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #0f172a;
+        color: #fff;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #fff;
+        color: #0f172a;
+      }
+      .status {
+        margin-top: 10px;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      .telemetry {
+        margin-top: 10px;
+        padding: 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 12px;
+        background: #f8fafc;
+      }
+    </style>
+  </head>
+  <body>
+    <h3 style="margin: 0 0 6px">Job Assistant Bridge</h3>
+    <p style="margin: 0; font-size: 12px; color: #475569">
+      Use this on an application page after running mapping preview in the web app.
+    </p>
+    <button id="execute-fill">Execute fill in browser tab</button>
+    <button id="open-options" class="secondary">Open options</button>
+    <div id="status" class="status">Idle.</div>
+    <div id="telemetry" class="telemetry">No telemetry yet.</div>
+    <script src="popup.js"></script>
+  </body>
+</html>

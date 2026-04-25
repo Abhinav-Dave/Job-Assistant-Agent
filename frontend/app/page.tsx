@@ -1,30 +1,25 @@
-import Link from "next/link";
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function HomePage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const check = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      router.replace(session?.access_token ? "/dashboard" : "/login");
+    };
+    void check();
+  }, [router]);
+
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">AI Job Application Assistant</h1>
-      <p className="mt-2 text-muted-foreground text-slate-600">
-        Scaffold — wire auth redirect (PRD): logged in → /dashboard, else → /login.
-      </p>
-      <ul className="mt-6 list-disc pl-6 space-y-2">
-        <li>
-          <Link className="text-blue-600 underline" href="/login">
-            /login
-          </Link>
-        </li>
-        <li>
-          <Link className="text-blue-600 underline" href="/register">
-            /register
-          </Link>
-        </li>
-        <li>
-          <Link className="text-blue-600 underline" href="/dashboard">
-            /dashboard
-          </Link>{" "}
-          (protected)
-        </li>
-      </ul>
+    <main className="flex min-h-screen items-center justify-center p-8">
+      <p className="text-sm text-slate-600">Checking session...</p>
     </main>
   );
 }

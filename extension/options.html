@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Job Assistant Extension Options</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 640px;
+        margin: 24px auto;
+        padding: 0 16px;
+        color: #0f172a;
+      }
+      .row {
+        margin-bottom: 12px;
+      }
+      input {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+      }
+      button {
+        margin-top: 8px;
+        padding: 8px 12px;
+        border: 1px solid #0f172a;
+        background: #0f172a;
+        color: #fff;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #status {
+        margin-top: 10px;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Job Assistant Bridge Options</h2>
+    <p style="color: #475569">
+      These values are optional. The web app sync flow usually writes bridge context automatically.
+    </p>
+    <div class="row">
+      <label for="app-origin">Web app origin</label>
+      <input id="app-origin" type="text" placeholder="http://localhost:3000" />
+    </div>
+    <button id="save">Save</button>
+    <p id="status"></p>
+    <script src="options.js"></script>
+  </body>
+</html>

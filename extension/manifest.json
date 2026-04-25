@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Job Assistant Extension Bridge",
+  "description": "In-tab execution bridge for Job Assistant mapping previews.",
+  "version": "0.1.0",
+  "permissions": ["storage", "activeTab", "tabs", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Job Assistant"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

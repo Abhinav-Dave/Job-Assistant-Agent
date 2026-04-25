@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/autofill", label: "Autofill Preview" },
-  { href: "/jobs", label: "Jobs Panel" },
+  { href: "/autofill", label: "Run Mapping Preview" },
+  { href: "/jobs", label: "Jobs Applied" },
   { href: "/profile", label: "Profile" },
 ];
 

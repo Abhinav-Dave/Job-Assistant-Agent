@@ -19,7 +19,12 @@ function confidenceTone(confidence: number) {
 
 export function AutofillPreviewWorkspace() {
   const {
+    profile,
+    authLoading,
+    dataLoading,
+    globalError,
     mappingState,
+    extensionTelemetry,
     editedMappingValues,
     setEditedMappingValue,
     runMappingPreview,
@@ -46,9 +51,29 @@ export function AutofillPreviewWorkspace() {
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold text-slate-900">Autofill Mapping Preview</h1>
         <p className="text-sm text-slate-600">
-          This is mapping preview only. Live execution happens in browser extension context.
+          Run mapping preview from backend first, then execute fill in browser tab using extension.
         </p>
       </header>
+
+      {(authLoading || dataLoading) && (
+        <Card>
+          <p className="text-sm text-slate-600">Loading authenticated profile and app data...</p>
+        </Card>
+      )}
+
+      {globalError && (
+        <Card className="border-rose-200 bg-rose-50">
+          <p className="text-sm text-rose-700">{globalError}</p>
+        </Card>
+      )}
+
+      {!profile && !authLoading && (
+        <Card className="border-rose-200 bg-rose-50">
+          <p className="text-sm text-rose-700">
+            Profile is unavailable. Log in again before running mapping preview.
+          </p>
+        </Card>
+      )}
 
       <Card className="space-y-3">
         <label htmlFor="job-url" className="text-sm font-medium text-slate-700">
@@ -61,14 +86,16 @@ export function AutofillPreviewWorkspace() {
             onChange={(event) => setUrl(event.target.value)}
             placeholder="https://jobs.example.com/apply"
           />
-          <Button className="bg-slate-900 text-white hover:bg-slate-700" onClick={() => runMappingPreview("success")}>
-            Run Mapping
+          <Button
+            className="bg-slate-900 text-white hover:bg-slate-700"
+            onClick={() => void runMappingPreview(url)}
+          >
+            Run mapping preview
           </Button>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => runMappingPreview("no_fields")}>Simulate no_fields_detected</Button>
-          <Button onClick={() => runMappingPreview("ats_not_ready")}>Simulate ats_page_not_ready</Button>
-        </div>
+        <p className="text-xs text-slate-500">
+          After preview review, execute fill from the extension in the active browser tab.
+        </p>
       </Card>
 
       {mappingState.isLoading && (
@@ -167,11 +194,31 @@ export function AutofillPreviewWorkspace() {
 
           <Card className="border-indigo-200 bg-indigo-50">
             <p className="text-sm text-indigo-800">
-              Next step: open the extension to execute fill in the authenticated browser tab.
+              Next step: Execute fill in browser tab from the extension popup.
             </p>
           </Card>
         </>
       )}
+
+      <Card className="space-y-2">
+        <h2 className="text-sm font-medium text-slate-700">Latest extension telemetry</h2>
+        {extensionTelemetry.length === 0 ? (
+          <p className="text-sm text-slate-600">
+            No extension fill attempts reported yet in this session.
+          </p>
+        ) : (
+          <ul className="space-y-2 text-sm text-slate-600">
+            {extensionTelemetry.slice(0, 3).map((item) => (
+              <li key={item.completedAt} className="rounded-md border border-slate-200 p-2">
+                <p className="font-medium text-slate-800">
+                  {item.successfulFills}/{item.mappedFields} fields filled
+                </p>
+                <p className="text-xs">{item.pageUrl}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
     </main>
   );
 }

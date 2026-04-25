@@ -1,0 +1,7 @@
+-- Add address fields required by UserProfile schema
+ALTER TABLE users ADD COLUMN IF NOT EXISTS address_line1 TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS address_line2 TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS province TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS country TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS postal_code TEXT;
