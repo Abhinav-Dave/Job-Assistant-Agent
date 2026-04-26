@@ -1,23 +1,31 @@
-# API reference (outline)
+# API reference
 
 **Base URL (local):** `http://localhost:8000`  
 **Auth:** `Authorization: Bearer <supabase_jwt>` on protected routes.
 
-Full contracts: PRD Section 12.
+## Routes
 
-| Method | Path | Auth | Request / response |
-|--------|------|------|-------------------|
-| GET | `/api/health` | Public | Response: status, database, llm, version, timestamp — TBD implementation |
-| POST | `/api/auth/verify` | — | TBD |
-| POST | `/api/users` | Protected | Create profile row — TBD |
-| GET | `/api/users/me` | Protected | Full `UserProfile` — TBD |
-| PATCH | `/api/users/me` | Protected | Partial update — TBD |
-| POST | `/api/resume/analyze` | Protected | multipart: resume + JD — TBD |
-| POST | `/api/generate/answer` | Protected | question + JD context — TBD |
-| POST | `/api/autofill` | Protected | URL + profile — TBD |
-| GET/POST/PATCH/DELETE | `/api/applications` | Protected | Application CRUD — TBD |
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| GET | `/api/health` | Public | Service health plus DB and LLM reachability |
+| POST | `/api/auth/verify` | Protected | Validates token and returns `{ user_id, valid }` |
+| POST | `/api/users` | Protected | Creates/updates initial user profile row |
+| GET | `/api/users/me` | Protected | Fetches authenticated `UserProfile` |
+| PATCH | `/api/users/me` | Protected | Partial profile update (including work/education arrays) |
+| GET | `/api/applications` | Protected | Lists user applications (optional `?status=` filter) |
+| POST | `/api/applications` | Protected | Creates a new application |
+| PATCH | `/api/applications/{application_id}` | Protected | Updates one application |
+| DELETE | `/api/applications/{application_id}` | Protected | Deletes one application |
+| GET | `/api/applications/{application_id}/score-report` | Protected | Fetches stored resume score report |
+| PUT | `/api/applications/{application_id}/score-report` | Protected | Upserts resume score report |
+| POST | `/api/resume/analyze` | Protected | Multipart resume + JD analyze endpoint |
+| POST | `/api/generate/answer` | Protected | Generates tailored answer from question + JD context |
+| POST | `/api/autofill` | Protected | Returns mapping suggestions for page form fields |
+| POST | `/api/feedback` | Protected | Logs agent feedback payload |
 
-**Error shape (all errors):**
+## Error shape
+
+Expected API errors are returned as flat JSON:
 
 ```json
 {
@@ -26,3 +34,8 @@ Full contracts: PRD Section 12.
   "detail": "<optional debug info>"
 }
 ```
+
+Validation and transient upstream failures are typically mapped as:
+
+- `422` for invalid input, scrape gaps, or agent-quality failures.
+- `503` for upstream LLM availability/empty-response failures.
