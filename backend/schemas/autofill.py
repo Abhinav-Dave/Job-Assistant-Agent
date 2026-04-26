@@ -51,6 +51,9 @@ class AutofillResult(BaseModel):
     mapped_fields: int = Field(ge=0)
     mappings: list[FieldMapping]
     unfilled_fields: list[str]
+    tracker_sync: str | None = None
+    tracker_sync_message: str | None = None
+    tracker_application_id: str | None = None
 
     @model_validator(mode="after")
     def mapped_vs_total(self) -> AutofillResult:

@@ -31,6 +31,10 @@ import {
   type ExtensionFillTelemetry,
   type WebToExtensionSyncMessage,
 } from "@/types/extension-bridge";
+import {
+  getMappingPreviewWarning,
+  pickSelectedApplicationId,
+} from "./mapping-preview-sync.js";
 import type {
   AutofillDiagnosticCode,
   AutofillResultPayload,
@@ -625,7 +629,7 @@ export function Phase10AppProvider({ children }: { children: ReactNode }) {
           role: "Application in progress",
           jd_url: pageUrl,
           notes: seedNote,
-          status: "saved",
+          status: "in_progress",
         });
         const mapped = mapApiApplication(created);
         setApplications((current) => [mapped, ...current]);
@@ -687,6 +691,29 @@ export function Phase10AppProvider({ children }: { children: ReactNode }) {
           mappedResult.mappings.map((mapping) => [mapping.field_id, mapping.suggested_value])
         )
       );
+      const trackerWarning = getMappingPreviewWarning(backendResult);
+      if (trackerWarning) {
+        setGlobalError(trackerWarning);
+      }
+      try {
+        const refreshedApplications = await getApplications();
+        const normalizedApps = refreshedApplications.map(mapApiApplication);
+        setApplications(normalizedApps);
+        setSelectedApplicationId((current) => {
+          return pickSelectedApplicationId({
+            currentSelectedId: current,
+            trackerApplicationId: backendResult.tracker_application_id ?? null,
+            applications: normalizedApps,
+            pageUrl: trimmedUrl,
+          });
+        });
+      } catch (refreshError) {
+        const message =
+          refreshError instanceof Error
+            ? refreshError.message
+            : "Mapping completed, but tracker list refresh failed.";
+        setGlobalError(message);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to run mapping preview.";
       setMappingState({

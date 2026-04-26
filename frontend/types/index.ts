@@ -75,6 +75,7 @@ export interface UpdateUserProfileRequest {
 
 export const applicationStatuses = [
   "saved",
+  "in_progress",
   "submitted",
   "response_received",
   "interview_requested",
@@ -177,6 +178,9 @@ export interface BackendAutofillResultPayload {
   mapped_fields: number;
   mappings: BackendAutofillFieldMapping[];
   unfilled_fields: string[];
+  tracker_sync?: "created" | "updated" | "unchanged" | "failed";
+  tracker_sync_message?: string | null;
+  tracker_application_id?: string | null;
 }
 
 export interface AutofillFieldMapping extends BackendAutofillFieldMapping {

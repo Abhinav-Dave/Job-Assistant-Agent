@@ -13,6 +13,7 @@ class ApplicationStatus(str, Enum):
     """`applications.status` CHECK constraint (PRD Section 10)."""
 
     saved = "saved"
+    in_progress = "in_progress"
     submitted = "submitted"
     response_received = "response_received"
     interview_requested = "interview_requested"

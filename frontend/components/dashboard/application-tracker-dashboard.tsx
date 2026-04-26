@@ -4,10 +4,12 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { usePhase10App } from "@/context/phase10-app-context";
+import { getDisplayApplicationStatus } from "@/lib/application-status";
 import type { ApplicationStatus } from "@/types";
 
 const statusTone: Record<ApplicationStatus, string> = {
   saved: "bg-slate-100 text-slate-700",
+  in_progress: "bg-indigo-100 text-indigo-700",
   submitted: "bg-blue-100 text-blue-700",
   response_received: "bg-cyan-100 text-cyan-700",
   interview_requested: "bg-amber-100 text-amber-800",
@@ -30,12 +32,16 @@ export function ApplicationTrackerDashboard() {
     .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
     .slice(0, 10);
   const statusCounts = applications.reduce<Record<ApplicationStatus, number>>(
-    (accumulator, application) => ({
-      ...accumulator,
-      [application.status]: accumulator[application.status] + 1,
-    }),
+    (accumulator, application) => {
+      const displayStatus = getDisplayApplicationStatus(application) as ApplicationStatus;
+      return {
+        ...accumulator,
+        [displayStatus]: accumulator[displayStatus] + 1,
+      };
+    },
     {
       saved: 0,
+      in_progress: 0,
       submitted: 0,
       response_received: 0,
       interview_requested: 0,
@@ -46,14 +52,6 @@ export function ApplicationTrackerDashboard() {
       withdrawn: 0,
     }
   );
-
-  const getDisplayStatus = (application: (typeof applications)[number]) => {
-    const notes = (application.notes ?? "").toLowerCase();
-    if (application.status === "saved" && notes.includes("extension fill")) {
-      return "in_progress";
-    }
-    return application.status;
-  };
 
   return (
     <main className="space-y-6 p-6 md:p-8">
@@ -105,7 +103,9 @@ export function ApplicationTrackerDashboard() {
               </tr>
             </thead>
             <tbody>
-              {mostRecentTen.map((application) => (
+              {mostRecentTen.map((application) => {
+                const displayStatus = getDisplayApplicationStatus(application) as ApplicationStatus;
+                return (
                 <tr key={application.id} className="border-b border-slate-100">
                   <td className="px-2 py-2">{application.company}</td>
                   <td className="px-2 py-2">{application.role}</td>
@@ -125,8 +125,8 @@ export function ApplicationTrackerDashboard() {
                     )}
                   </td>
                   <td className="px-2 py-2">
-                    <Badge className={statusTone[application.status]}>
-                      {application.status}
+                    <Badge className={statusTone[displayStatus]}>
+                      {displayStatus}
                     </Badge>
                   </td>
                   <td className="px-2 py-2 text-slate-600">
@@ -138,7 +138,8 @@ export function ApplicationTrackerDashboard() {
                     {typeof application.last_score === "number" ? `${application.last_score}%` : "-"}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {mostRecentTen.length === 0 && (
                 <tr>
                   <td className="px-2 py-3 text-slate-500" colSpan={6}>

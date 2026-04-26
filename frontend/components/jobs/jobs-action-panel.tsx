@@ -6,11 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { usePhase10App } from "@/context/phase10-app-context";
+import { getDisplayApplicationStatus } from "@/lib/application-status";
 import type { ApplicationStatus, JobApplication, ResumeScoreReport } from "@/types";
 
 const PAGE_SIZE = 20;
 const statusTone: Record<ApplicationStatus, string> = {
   saved: "bg-slate-100 text-slate-700",
+  in_progress: "bg-indigo-100 text-indigo-700",
   submitted: "bg-blue-100 text-blue-700",
   response_received: "bg-cyan-100 text-cyan-700",
   interview_requested: "bg-amber-100 text-amber-800",
@@ -77,7 +79,9 @@ export function JobsActionPanel() {
             </tr>
           </thead>
           <tbody>
-            {pagedApplications.map((application) => (
+            {pagedApplications.map((application) => {
+              const displayStatus = getDisplayApplicationStatus(application) as ApplicationStatus;
+              return (
               <tr
                 key={application.id}
                 className={`cursor-pointer border-b border-slate-100 ${
@@ -103,7 +107,9 @@ export function JobsActionPanel() {
                   )}
                 </td>
                 <td className="px-2 py-2">
-                  <Badge className={statusTone[application.status]}>{application.status}</Badge>
+                  <Badge className={statusTone[displayStatus]}>
+                    {displayStatus}
+                  </Badge>
                 </td>
                 <td className="px-2 py-2 text-slate-600">
                   {application.date_applied ? new Date(application.date_applied).toLocaleDateString() : "-"}
@@ -112,7 +118,8 @@ export function JobsActionPanel() {
                   {typeof application.last_score === "number" ? `${application.last_score}%` : "-"}
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {pagedApplications.length === 0 && (
               <tr>
                 <td className="px-2 py-3 text-slate-500" colSpan={6}>
@@ -147,7 +154,9 @@ export function JobsActionPanel() {
             <h2 className="text-lg font-semibold text-slate-900">{selectedApplication.role}</h2>
             <p className="text-sm text-slate-600">{selectedApplication.company}</p>
             <p className="text-sm text-slate-600 break-all">{selectedApplication.jd_url ?? "No job URL saved"}</p>
-            <Badge className="bg-slate-100 text-slate-700">{selectedApplication.status}</Badge>
+            <Badge className="bg-slate-100 text-slate-700">
+              {getDisplayApplicationStatus(selectedApplication) as ApplicationStatus}
+            </Badge>
             <p className="text-sm text-slate-600">{selectedApplication.notes ?? "No notes yet."}</p>
           </Card>
 
@@ -163,6 +172,9 @@ export function JobsActionPanel() {
                   setActionMessage("This job has no URL saved yet.");
                   return;
                 }
+                // Always open/focus the target ATS page from the user click so
+                // the execution flow is explicit and consistent across jobs.
+                window.open(pageUrl, "_blank", "noopener,noreferrer");
                 setIsExecutingFill(true);
                 setActionMessage("Requesting extension fill for matching ATS tab...");
                 const result = await executeFillInBrowserTab(pageUrl);
