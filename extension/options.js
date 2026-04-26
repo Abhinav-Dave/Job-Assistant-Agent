@@ -20,6 +20,17 @@ saveButton.addEventListener("click", async () => {
     setStatus("App origin is required.", true);
     return;
   }
+  let parsed;
+  try {
+    parsed = new URL(appOrigin);
+  } catch {
+    setStatus("App origin must be a valid URL, e.g. http://localhost:3000", true);
+    return;
+  }
+  if (!parsed.protocol.startsWith("http")) {
+    setStatus("App origin must start with http:// or https://", true);
+    return;
+  }
   await chrome.storage.local.set({ [APP_ORIGIN_KEY]: appOrigin });
   setStatus("Options saved.");
 });

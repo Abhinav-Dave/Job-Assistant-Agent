@@ -16,7 +16,13 @@ export interface ExtensionFieldFillResult {
   profileKey: string;
   attemptedValue: string;
   success: boolean;
-  reason: "filled" | "field_not_found" | "read_only" | "empty_value" | "error";
+  reason:
+    | "filled"
+    | "field_not_found"
+    | "incompatible_field"
+    | "read_only"
+    | "empty_value"
+    | "error";
   confidence: number;
 }
 
@@ -31,6 +37,7 @@ export interface ExtensionFillTelemetry {
   mappingPreview: AutofillResultPayload | null;
   fieldResults: ExtensionFieldFillResult[];
   errorMessage: string | null;
+  telemetryDispatchError?: string | null;
 }
 
 export interface ExtensionApplicationEvent {

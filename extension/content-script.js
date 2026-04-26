@@ -98,6 +98,24 @@ function isCompatibleFieldType(element, mappingFieldType, profileKey) {
     if (normalizedProfileKey === "postal_code") {
       return includesAny(descriptor, ["postal", "zip", "pin"]);
     }
+    if (normalizedProfileKey === "first_name") {
+      return includesAny(descriptor, ["first name", "given name", "forename"]);
+    }
+    if (normalizedProfileKey === "last_name") {
+      return includesAny(descriptor, ["last name", "surname", "family name"]);
+    }
+    if (normalizedProfileKey === "full_name") {
+      return (
+        includesAny(descriptor, ["full name", "name"]) &&
+        !includesAny(descriptor, ["first name", "last name", "surname", "family name"])
+      );
+    }
+    if (normalizedProfileKey === "linkedin_url") {
+      return includesAny(descriptor, ["linkedin", "linked in", "profile url", "profile link"]);
+    }
+    if (normalizedProfileKey === "portfolio_url") {
+      return includesAny(descriptor, ["portfolio", "website", "personal site", "url", "link"]);
+    }
     return true;
   }
   const normalizedMappingType = String(mappingFieldType).toLowerCase();
@@ -151,6 +169,40 @@ function isCompatibleFieldType(element, mappingFieldType, profileKey) {
       return (
         ["text", "search"].includes(inputType) &&
         includesAny(descriptor, ["postal", "zip", "zip code", "postcode", "pin"])
+      );
+    }
+    if (normalizedProfileKey === "first_name") {
+      return (
+        ["text", "search"].includes(inputType) &&
+        includesAny(descriptor, ["first name", "given name", "forename"]) &&
+        !includesAny(descriptor, ["last name", "surname", "family name"])
+      );
+    }
+    if (normalizedProfileKey === "last_name") {
+      return (
+        ["text", "search"].includes(inputType) &&
+        includesAny(descriptor, ["last name", "surname", "family name"]) &&
+        !includesAny(descriptor, ["first name", "given name", "forename"])
+      );
+    }
+    if (normalizedProfileKey === "full_name") {
+      return (
+        ["text", "search"].includes(inputType) &&
+        includesAny(descriptor, ["full name", "name"]) &&
+        !includesAny(descriptor, ["first name", "last name", "surname", "family name"])
+      );
+    }
+    if (normalizedProfileKey === "linkedin_url") {
+      return (
+        ["url", "text", "search"].includes(inputType) &&
+        includesAny(descriptor, ["linkedin", "linked in", "profile"])
+      );
+    }
+    if (normalizedProfileKey === "portfolio_url") {
+      return (
+        ["url", "text", "search"].includes(inputType) &&
+        includesAny(descriptor, ["portfolio", "website", "personal site", "link", "url"]) &&
+        !includesAny(descriptor, ["linkedin", "email", "phone"])
       );
     }
     if (normalizedMappingType === "text") {
@@ -220,6 +272,15 @@ async function getBridgeContext() {
 
 async function reportTelemetry(payload) {
   await chrome.runtime.sendMessage({ type: "JA_TELEMETRY_REPORT", payload });
+}
+
+async function dispatchTelemetry(payload) {
+  try {
+    await reportTelemetry(payload);
+    return null;
+  } catch (error) {
+    return String(error?.message || error || "telemetry_dispatch_failed");
+  }
 }
 
 async function requestMappings(context) {
@@ -347,11 +408,14 @@ async function executeFillInTab() {
     mappedFields: Number(mappingRaw?.mapped_fields ?? mappings.length),
     successfulFills,
     failedFills,
-    mappingPreview: null,
+    mappingPreview: mappingRaw ?? null,
     fieldResults,
     errorMessage: null,
   };
-  await reportTelemetry(telemetry);
+  const telemetryDispatchError = await dispatchTelemetry(telemetry);
+  if (telemetryDispatchError) {
+    telemetry.telemetryDispatchError = telemetryDispatchError;
+  }
   return telemetry;
 }
 
@@ -447,7 +511,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           fieldResults: [],
           errorMessage: String(error.message || error),
         };
-        await reportTelemetry(payload);
+        const telemetryDispatchError = await dispatchTelemetry(payload);
+        if (telemetryDispatchError) {
+          payload.telemetryDispatchError = telemetryDispatchError;
+        }
         sendResponse({ ok: false, error: payload.errorMessage });
       });
     return true;

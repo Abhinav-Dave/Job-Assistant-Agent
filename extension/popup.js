@@ -3,6 +3,11 @@ const optionsButton = document.getElementById("open-options");
 const statusEl = document.getElementById("status");
 const telemetryEl = document.getElementById("telemetry");
 
+function setExecuteLoading(loading) {
+  executeButton.disabled = loading;
+  executeButton.textContent = loading ? "Executing..." : "Execute fill in browser tab";
+}
+
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
   statusEl.style.color = isError ? "#be123c" : "#334155";
@@ -58,6 +63,16 @@ async function requestContextSyncFromWebApp() {
   return true;
 }
 
+async function ensureBridgeContext() {
+  let context = await getBridgeContext();
+  if (context) {
+    return context;
+  }
+  await requestContextSyncFromWebApp();
+  context = await getBridgeContext();
+  return context;
+}
+
 async function executeWithRetry(tabId) {
   try {
     return await chrome.tabs.sendMessage(tabId, { type: "JA_EXECUTE_FILL_IN_TAB" });
@@ -76,16 +91,13 @@ async function executeWithRetry(tabId) {
 }
 
 executeButton.addEventListener("click", async () => {
+  setExecuteLoading(true);
   setStatus("Executing fill in active tab...");
   try {
-    let context = await getBridgeContext();
-    if (!context) {
-      await requestContextSyncFromWebApp();
-      context = await getBridgeContext();
-    }
+    const context = await ensureBridgeContext();
     if (!context) {
       throw new Error(
-        "Extension bridge context not found. Open and refresh the dashboard tab, then try again."
+        "Bridge context missing. Open the web app dashboard, keep it logged in, then try again."
       );
     }
 
@@ -98,6 +110,8 @@ executeButton.addEventListener("click", async () => {
     setTelemetry(response.telemetry);
   } catch (error) {
     setStatus(String(error.message || error), true);
+  } finally {
+    setExecuteLoading(false);
   }
 });
 
@@ -106,3 +120,8 @@ optionsButton.addEventListener("click", () => {
 });
 
 void loadLastTelemetry();
+void ensureBridgeContext().then((context) => {
+  if (!context) {
+    setStatus("Waiting for dashboard context sync.", true);
+  }
+});

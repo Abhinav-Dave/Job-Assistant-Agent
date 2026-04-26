@@ -85,21 +85,31 @@ def _ensure_user_profile_row(user_id: str) -> dict[str, Any]:
         return existing
 
     email, full_name = _get_auth_defaults(user_id)
-    inserted = (
-        get_supabase()
-        .table("users")
-        .insert(
-            {
-                "id": user_id,
-                "email": email,
-                "full_name": full_name,
-                "skills": [],
-                "preferences": {},
-                "onboarding_complete": False,
-            }
+    try:
+        inserted = (
+            get_supabase()
+            .table("users")
+            .insert(
+                {
+                    "id": user_id,
+                    "email": email,
+                    "full_name": full_name,
+                    "skills": [],
+                    "preferences": {},
+                    "onboarding_complete": False,
+                }
+            )
+            .execute()
         )
-        .execute()
-    )
+    except Exception as exc:
+        message = str(exc).lower()
+        # Stale or forged JWTs can reference users absent in auth/users FK tables.
+        if "foreign key" in message or "violates foreign key constraint" in message:
+            raise HTTPException(
+                status_code=401,
+                detail="Authenticated user record is missing. Log out and sign in again.",
+            ) from exc
+        raise
     inserted_rows = inserted.data or []
     if not inserted_rows:
         raise HTTPException(status_code=500, detail="Failed to create profile row")
