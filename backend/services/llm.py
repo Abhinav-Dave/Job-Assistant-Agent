@@ -203,6 +203,7 @@ def call_gemini(
             if exc.code == "llm_empty_response":
                 raise
             last = exc
+            # Retry only when failures are likely transient/model-specific; preserve first hard failure.
             if idx < len(models) - 1 and _gemini_retryable(exc):
                 logger.warning(
                     "Gemini model %s failed (%s), retrying with %s",

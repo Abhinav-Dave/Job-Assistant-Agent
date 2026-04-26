@@ -195,6 +195,20 @@ const inferCompanyFromUrl = (pageUrl: string) => {
   }
 };
 
+const buildBridgeSyncMessage = (
+  accessToken: string,
+  profile: UserProfile | null
+): WebToExtensionSyncMessage => ({
+  source: BRIDGE_SOURCE_WEB,
+  type: "JA_SET_BRIDGE_CONTEXT",
+  payload: {
+    apiBaseUrl: process.env.NEXT_PUBLIC_API_URL ?? "",
+    accessToken,
+    ...(profile ? { profile } : {}),
+    syncedAt: new Date().toISOString(),
+  },
+});
+
 export function Phase10AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [applications, setApplications] = useState<JobApplication[]>([]);
@@ -712,6 +726,8 @@ export function Phase10AppProvider({ children }: { children: ReactNode }) {
         }, 25000);
 
         const onMessage = (event: MessageEvent<BridgeWindowMessage>) => {
+          // Accept only same-window extension bridge events and correlate by requestId
+          // to avoid resolving this promise from stale or unrelated events.
           if (event.source !== window) {
             return;
           }
@@ -771,16 +787,7 @@ export function Phase10AppProvider({ children }: { children: ReactNode }) {
       if (!session?.access_token) {
         return;
       }
-      const message: WebToExtensionSyncMessage = {
-        source: BRIDGE_SOURCE_WEB,
-        type: "JA_SET_BRIDGE_CONTEXT",
-        payload: {
-          apiBaseUrl: process.env.NEXT_PUBLIC_API_URL ?? "",
-          accessToken: session.access_token,
-          ...(profile ? { profile } : {}),
-          syncedAt: new Date().toISOString(),
-        },
-      };
+      const message = buildBridgeSyncMessage(session.access_token, profile);
       window.postMessage(message, window.location.origin);
     };
     void syncBridgeContext();
@@ -806,16 +813,7 @@ export function Phase10AppProvider({ children }: { children: ReactNode }) {
         if (!session?.access_token) {
           return;
         }
-        const message: WebToExtensionSyncMessage = {
-          source: BRIDGE_SOURCE_WEB,
-          type: "JA_SET_BRIDGE_CONTEXT",
-          payload: {
-            apiBaseUrl: process.env.NEXT_PUBLIC_API_URL ?? "",
-            accessToken: session.access_token,
-            ...(profile ? { profile } : {}),
-            syncedAt: new Date().toISOString(),
-          },
-        };
+        const message = buildBridgeSyncMessage(session.access_token, profile);
         window.postMessage(message, window.location.origin);
       })();
     };

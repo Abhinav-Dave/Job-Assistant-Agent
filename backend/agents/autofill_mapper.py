@@ -450,8 +450,7 @@ def map_fields_to_profile(page_url: str, user_profile: UserProfile) -> AutofillR
             for m in all_mappings
             if _MIN_SUGGEST_CONFIDENCE <= m.confidence < _AUTO_FILL_CONFIDENCE
         ]
-        _unknown = [m for m in all_mappings if m.confidence < _MIN_SUGGEST_CONFIDENCE]
-
+        # Keep unknown labels aligned to original field labels for stable UI messaging.
         unknown_labels = list(dict.fromkeys(rule_unknowns + llm_unknowns))
         mapped_count = len(auto_fill) + len(suggest)
         fill_rate = mapped_count / len(fields) if fields else 0.0
